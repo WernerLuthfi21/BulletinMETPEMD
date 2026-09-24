@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>METP Bulletin — Admin</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='2' width='26' height='28' rx='3' fill='%238c1727'/%3E%3Crect x='7' y='6' width='18' height='20' fill='%23f6f1e5'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+
+<div id="gate" class="gate">
+  <form id="loginForm" class="login-card" autocomplete="on">
+    <div class="login-mark">METP</div>
+    <h1>Bulletin admin</h1>
+    <p class="sub">Sign in to manage issues, uploads, comments and quotes.</p>
+    <label>Email<input type="email" id="loginEmail" required autocomplete="username"></label>
+    <label>Password<input type="password" id="loginPassword" required autocomplete="current-password"></label>
+    <p class="msg" id="loginMsg" role="status"></p>
+    <button class="btn primary" type="submit" id="loginBtn">Sign in</button>
+  </form>
+  <div class="login-card" id="notConfigured" hidden>
+    <div class="login-mark">METP</div>
+    <h1>Backend not configured</h1>
+    <p class="sub">Fill in <code>supabaseUrl</code> and <code>supabaseAnonKey</code> in <code>config.js</code>, run <code>supabase/schema.sql</code> in your Supabase project, then reload this page. See <code>README.md</code> for the full setup.</p>
+  </div>
+  <div class="login-card" id="notAuthorized" hidden>
+    <div class="login-mark">METP</div>
+    <h1>Not an admin account</h1>
+    <p class="sub">You're signed in, but this account isn't listed in the <code>admins</code> table. Ask an existing admin to add your user ID, or see <code>README.md</code>.</p>
+    <button class="btn" type="button" id="notAuthLogout">Sign out</button>
+  </div>
+</div>
+
+<div id="app" class="app" hidden>
+  <header class="topbar">
+    <div class="brand">METP <span>Admin</span></div>
+    <nav class="tabsbar" aria-label="Sections">
+      <button class="tabbtn" data-panel="issues" aria-current="true" type="button">Issues</button>
+      <button class="tabbtn" data-panel="comments" type="button">Suggestions <span class="pill" id="pendingCount" hidden>0</span></button>
+      <button class="tabbtn" data-panel="quotes" type="button">Quotes</button>
+    </nav>
+    <div class="who">
+      <span id="whoEmail"></span>
+      <button class="btn sm" id="logoutBtn" type="button">Sign out</button>
+    </div>
+  </header>
+
+  <main class="main">
+    <!-- ISSUES -->
+    <section class="panel" id="panel-issues">
+      <div class="panel-head">
+        <h2>Issues</h2>
+        <button class="btn primary" id="newIssueBtn" type="button">+ New issue</button>
+      </div>
+      <div class="table-wrap">
+        <table class="tbl" id="issuesTable">
+          <thead><tr><th>Issue</th><th>Title</th><th>Status</th><th>Pages</th><th>Published</th><th></th></tr></thead>
+          <tbody id="issuesBody"></tbody>
+        </table>
+        <p class="empty" id="issuesEmpty" hidden>No issues yet — create the first one.</p>
+      </div>
+    </section>
+
+    <!-- COMMENTS -->
+    <section class="panel" id="panel-comments" hidden>
+      <div class="panel-head">
+        <h2>Reader suggestions</h2>
+        <div class="seg" id="commentFilter" role="tablist">
+          <button class="segbtn" data-status="pending" aria-selected="true" type="button">Pending</button>
+          <button class="segbtn" data-status="approved" type="button">Approved</button>
+          <button class="segbtn" data-status="rejected" type="button">Rejected</button>
+        </div>
+      </div>
+      <div class="cards" id="commentsList"></div>
+      <p class="empty" id="commentsEmpty" hidden>Nothing here.</p>
+    </section>
+
+    <!-- QUOTES -->
+    <section class="panel" id="panel-quotes" hidden>
+      <div class="panel-head">
+        <h2>Quote of the day</h2>
+      </div>
+      <form class="inline-form" id="quoteForm">
+        <input type="text" id="quoteInput" placeholder="Add a new quote…" maxlength="200" required>
+        <button class="btn primary" type="submit">Add</button>
+      </form>
+      <div class="cards" id="quotesList"></div>
+      <p class="empty" id="quotesEmpty" hidden>No quotes yet.</p>
+    </section>
+  </main>
+</div>
+
+<!-- Issue editor -->
+<dialog id="issueDialog" class="modal">
+  <form class="modal-card wide" id="issueForm" method="dialog">
+    <div class="modal-head">
+      <h2 id="issueDialogTitle">New issue</h2>
+      <button class="icon-btn" id="issueDialogClose" type="button" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid2">
+        <label>Month<select id="fMonth" required>
+          <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+          <option value="4">April</option><option value="5">May</option><option value="6">June</option>
+          <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+          <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+        </select></label>
+        <label>Year<input type="number" id="fYear" min="2000" max="2100" required></label>
+      </div>
+      <label>Title<input type="text" id="fTitle" maxlength="140" placeholder="e.g. Material Goes to Lotte Chemical"></label>
+      <div class="grid2">
+        <label>Editor chief<input type="text" id="fEditorChief" maxlength="80"></label>
+        <label>Editors <span class="hint-sm">comma-separated</span><input type="text" id="fEditors" maxlength="200"></label>
+      </div>
+      <label>Contributors <span class="hint-sm">comma-separated</span><input type="text" id="fContributors" maxlength="300"></label>
+
+      <div class="upload-zone" id="uploadZone" tabindex="0" role="button" aria-label="Upload bulletin file, PDF, PNG or JPG">
+        <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" hidden>
+        <div id="uploadIdle">
+          <strong>Drop a PDF, PNG or JPG here</strong>
+          <span>or click to browse · up to <span id="maxMbLabel">25</span> MB</span>
+        </div>
+        <div id="uploadCurrent" hidden>
+          <strong id="uploadCurrentName">current-file.pdf</strong>
+          <span>already uploaded for this issue — drop a new file to replace it</span>
+        </div>
+        <div id="uploadProgress" hidden>
+          <div class="bar"><div class="bar-fill" id="uploadBarFill"></div></div>
+          <span id="uploadStatus">Uploading…</span>
+        </div>
+      </div>
+      <p class="msg" id="uploadMsg" role="status"></p>
+
+      <div class="hl-head">
+        <span>Text version (for the reader &amp; screen readers)</span>
+        <button class="btn sm" type="button" id="addHighlight">+ Add section</button>
+      </div>
+      <div id="highlightsList"></div>
+
+      <p class="msg" id="issueFormMsg" role="status"></p>
+    </div>
+    <div class="modal-foot">
+      <span class="foot-left">
+        <label class="check"><input type="checkbox" id="fPublished"> Published (visible on the public site)</label>
+      </span>
+      <button class="btn" type="button" id="issueCancel">Cancel</button>
+      <button class="btn danger" type="button" id="issueDelete" hidden>Delete issue</button>
+      <button class="btn primary" type="submit" id="issueSave">Save issue</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="config.js"></script>
+<script src="vendor/supabase/supabase.min.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>

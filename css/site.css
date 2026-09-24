@@ -1,0 +1,631 @@
+/* ==========================================================================
+   METP Digital Engineering Bulletin — public site styles
+   --------------------------------------------------------------------------
+   ONE LIGHT: a single key light sits at the TOP-LEFT of the desk.
+   Every object follows it: highlights on top/left edges, shadows fall to the
+   bottom-right, using the shared --sh-* shadow tokens below.
+   Sections: 1 tokens · 2 base · 3 desk/scene · 4 binder body · 5 leaves ·
+             6 page-flip layers · 7 rings/sticker/bar/tabs · 8 props ·
+             9 dialogs · 10 responsive · 11 reduced motion
+   ========================================================================== */
+
+/* ---------- 1. tokens ---------- */
+@font-face{font-family:"Plex";font-weight:400;font-display:swap;src:url(../assets/fonts/ibm-plex-sans-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Plex";font-weight:500;font-display:swap;src:url(../assets/fonts/ibm-plex-sans-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"Plex";font-weight:600;font-display:swap;src:url(../assets/fonts/ibm-plex-sans-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:"PlexCond";font-weight:500;font-display:swap;src:url(../assets/fonts/ibm-plex-sans-condensed-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"PlexCond";font-weight:600;font-display:swap;src:url(../assets/fonts/ibm-plex-sans-condensed-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:"Marker";font-weight:400;font-display:swap;src:url(../assets/fonts/permanent-marker-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Hand";font-weight:400;font-display:swap;src:url(../assets/fonts/caveat-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Hand";font-weight:700;font-display:swap;src:url(../assets/fonts/caveat-latin-700-normal.woff2) format("woff2")}
+
+:root{
+  --ui:"Plex","Segoe UI",system-ui,-apple-system,Arial,sans-serif;
+  --cond:"PlexCond","Arial Narrow","Plex",sans-serif;
+  --marker:"Marker","Segoe Print","Comic Sans MS",cursive;
+  --hand:"Hand","Segoe Print","Bradley Hand",cursive;
+
+  --red-950:#2c0509; --red-900:#3d0710; --red-800:#560b17; --red-700:#701120;
+  --red-600:#8c1727; --red-500:#a81f31; --red-400:#c1333f;
+  --paper:#f6f1e5; --paper-2:#ebe4d3; --paper-3:#d9d0bb;
+  --ink:#242220; --ink-soft:#5a534b; --graphite:#2f2d2b;
+  --steel-1:#f2f4f5; --steel-2:#b9bec2; --steel-3:#7d848a; --steel-4:#454a4f;
+  --note:#efd766; --note-2:#e6c94d;
+  --blue:#3f6f93; --green:#6c9367;
+
+  /* shared shadow tokens (light = top-left → shadows go down-right) */
+  --sh-1:drop-shadow(2px 3px 2px rgba(22,9,4,.38));
+  --sh-2:drop-shadow(4px 7px 5px rgba(22,9,4,.40));
+  --sh-3:drop-shadow(8px 13px 9px rgba(22,9,4,.42));
+  --edge-hi:rgba(255,255,255,.55);
+  --edge-lo:rgba(0,0,0,.35);
+
+  --ease:cubic-bezier(.22,.7,.25,1);
+}
+
+/* ---------- 2. base ---------- */
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+html,body{margin:0;min-height:100%}
+body{
+  font-family:var(--ui);color:var(--ink);background:#3a2213;
+  overflow-x:hidden;-webkit-tap-highlight-color:transparent;
+}
+button{font-family:inherit;color:inherit}
+img{max-width:100%}
+.sr-only{position:absolute!important;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+:focus-visible{outline:3px solid #ffd76a;outline-offset:2px;border-radius:3px}
+[hidden]{display:none!important}
+
+/* ---------- 3. desk / scene ---------- */
+.desk{
+  position:relative;min-height:100vh;min-height:100dvh;
+  display:grid;place-items:center;padding:24px 12px 28px;
+  background:#4a2b17 url(../assets/textures/desk-wood.webp) center/cover no-repeat;
+  isolation:isolate;
+}
+/* soft key-light pool + edge falloff, same direction as every prop */
+.desk::before{
+  content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(ellipse 70% 60% at 28% 18%,rgba(255,226,180,.16),transparent 70%),
+    radial-gradient(ellipse 120% 100% at 60% 55%,transparent 55%,rgba(10,4,1,.5) 100%);
+}
+.scene{position:relative;width:100%;display:flex;justify-content:center}
+/* The rig is a real grid, so the three groups (desk props | binder + month tabs |
+   quote + suggestions) each own their own column and can never overlap. */
+.rig{position:relative;display:grid;grid-template-columns:auto auto auto;column-gap:12px;align-items:start;justify-items:start;width:max-content;max-width:100%}
+/* All binder sizing lives here (not on .binder) so the month-tab strip, which is
+   a sibling of the binder, can read the same variables on small screens.
+   --tabs-gutter is the strip of desk reserved for the month tabs that stick
+   out of the binder's right edge. */
+.binder-zone{
+  --lw:414px;--lh:calc(var(--lw)*1.5459);--ms:30px;--mt:66px;--mb:62px;--tabs-gutter:88px;
+  position:relative;z-index:2;flex:none;padding-right:var(--tabs-gutter);
+}
+
+/* ---------- 4. binder body ---------- */
+.binder{
+  position:relative;
+  width:calc(var(--lw)*2 + var(--ms)*2);
+  height:calc(var(--lh) + var(--mt) + var(--mb));
+  perspective:2600px;perspective-origin:50% 35%;
+  transition:transform .9s var(--ease);
+  transform:translateX(0) rotate(-.35deg);
+}
+/* closed: only the right half (front cover) is visible, centred */
+/* (+ half the tab gutter, so the lone cover sits centred between the desk props) */
+.binder[data-state="closed"]{transform:translateX(calc((var(--lw) + var(--ms))/-2 + var(--tabs-gutter)/2)) rotate(-.35deg)}
+.binder[data-mode="single"][data-state="closed"]{transform:rotate(-.35deg)}
+
+.b-shadow{
+  position:absolute;inset:10px -8px -22px 14px;border-radius:14px;z-index:0;
+  background:rgba(14,5,2,.55);filter:blur(18px);transition:opacity .6s;
+}
+.binder[data-state="closed"] .b-shadow{clip-path:inset(0 0 0 50%)}
+
+.cover{
+  position:absolute;top:0;bottom:0;width:50%;z-index:1;border-radius:9px;
+  background:
+    url(../assets/textures/cover-grain.webp) 0 0/230px auto,
+    linear-gradient(135deg,var(--red-500) 0%,var(--red-600) 30%,var(--red-800) 78%,var(--red-900) 100%);
+  background-blend-mode:soft-light,normal;
+  box-shadow:
+    inset 1px 1px 0 rgba(255,190,190,.30), inset -1px -1px 0 rgba(0,0,0,.35),
+    1px 1px 0 #4a0912,2px 2px 0 #460811,3px 3px 0 #42070f,4px 4px 0 #3d070e,
+    5px 5px 0 #38060d,6px 6px 0 #33060c,7px 7px 0 #2f050b,8px 9px 0 #2a050a;
+}
+.cover.left{left:0;border-radius:9px 3px 3px 9px;box-shadow:
+    inset 1px 1px 0 rgba(255,190,190,.30), inset -1px -1px 0 rgba(0,0,0,.30),
+    -1px 1px 0 #4a0912,-2px 2px 0 #460811,-3px 3px 0 #42070f,-4px 4px 0 #3d070e,
+    -5px 5px 0 #38060d,-6px 6px 0 #33060c,-7px 7px 0 #2f050b,-8px 9px 0 #2a050a}
+.cover.right{right:0;border-radius:3px 9px 9px 3px}
+.binder[data-state="closed"] .cover.left,.binder[data-state="closed"] .rings,
+.binder[data-state="closed"] .b-bar,.binder[data-state="closed"] .sticker,
+.binder[data-state="closed"] .spread,.binder[data-state="closed"] .hint{opacity:0;visibility:hidden}
+.binder[data-state="closed"] + .tabs{opacity:0;visibility:hidden;pointer-events:none}
+.binder[data-mode="single"] .cover.left{display:none}
+.binder[data-mode="single"] .cover.right{left:0;right:0;width:auto;border-radius:3px 9px 9px 3px}
+/* gutter (spine recess) */
+.b-crease{
+  position:absolute;left:50%;top:0;bottom:0;width:46px;transform:translateX(-50%);z-index:2;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(0,0,0,.28) 34%,rgba(0,0,0,.5) 50%,rgba(0,0,0,.28) 66%,transparent);
+}
+.binder[data-mode="single"] .b-crease{left:calc(var(--ms) + 8px);width:30px}
+
+/* ---------- 5. spread & leaves ---------- */
+.spread{
+  position:absolute;z-index:3;left:var(--ms);top:var(--mt);
+  width:calc(var(--lw)*2);height:var(--lh);
+  perspective:2200px;perspective-origin:50% 40%;
+  touch-action:pan-y;user-select:none;-webkit-user-select:none;
+}
+.binder[data-mode="single"] .spread{width:var(--lw);left:calc(var(--ms) + 16px)}
+.binder[data-mode="single"]{width:calc(var(--lw) + var(--ms)*2 + 16px)}
+
+.slot{position:absolute;top:0;width:var(--lw);height:var(--lh)}
+.slot.left{left:0;box-shadow:-1px 1px 0 #ebe5d6,-2px 2px 0 #c9c2b0,-3px 3px 0 #efe9dc,-4px 4px 0 #bdb6a3,-5px 5px 0 #e8e2d3,-6px 6px 0 #a9a290,-6px 8px 6px rgba(20,8,3,.4)}
+.slot.right{left:var(--lw);box-shadow:1px 1px 0 #ebe5d6,2px 2px 0 #c9c2b0,3px 3px 0 #efe9dc,4px 4px 0 #bdb6a3,5px 5px 0 #e8e2d3,6px 6px 0 #a9a290,8px 10px 8px rgba(20,8,3,.45)}
+.binder[data-mode="single"] .slot.right{left:0}
+.binder[data-mode="single"] .slot.left{display:none}
+.slot.empty{visibility:hidden;box-shadow:none}
+
+.leaf{
+  position:absolute;inset:0;overflow:hidden;background:#faf5e8;color:var(--ink);
+}
+/* Warm paper with a very light grain. Any page image that does not match the
+   page's aspect ratio (a landscape PNG, an infographic) is letterboxed by
+   object-fit:contain, so the paper underneath is what people actually see there:
+   it must read as clean paper, never as dark noise. The photo itself sits above. */
+.leaf::before{
+  content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
+  background:url(../assets/textures/paper-grain.webp) 0 0/220px auto;
+  mix-blend-mode:multiply;opacity:.10;
+}
+/* inner-edge falloff into the gutter + ring holes on the hinge edge */
+.leaf::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:4}
+.leaf[data-side="left"]::after{
+  background:
+    radial-gradient(circle at calc(100% - 9px) 16%,#2b0509 0 3.6px,rgba(0,0,0,.35) 4.6px,transparent 6px),
+    radial-gradient(circle at calc(100% - 9px) 50%,#2b0509 0 3.6px,rgba(0,0,0,.35) 4.6px,transparent 6px),
+    radial-gradient(circle at calc(100% - 9px) 84%,#2b0509 0 3.6px,rgba(0,0,0,.35) 4.6px,transparent 6px),
+    linear-gradient(to left,rgba(35,15,6,.34),rgba(35,15,6,.10) 5%,transparent 13%);
+}
+.leaf[data-side="right"]::after{
+  background:
+    radial-gradient(circle at 9px 16%,#2b0509 0 3.6px,rgba(0,0,0,.35) 4.6px,transparent 6px),
+    radial-gradient(circle at 9px 50%,#2b0509 0 3.6px,rgba(0,0,0,.35) 4.6px,transparent 6px),
+    radial-gradient(circle at 9px 84%,#2b0509 0 3.6px,rgba(0,0,0,.35) 4.6px,transparent 6px),
+    linear-gradient(to right,rgba(35,15,6,.34),rgba(35,15,6,.10) 5%,transparent 13%);
+}
+.binder[data-mode="single"] .leaf[data-side="right"]::after{
+  background:
+    radial-gradient(circle at 9px 16%,#2b0509 0 3.6px,rgba(0,0,0,.35) 4.6px,transparent 6px),
+    radial-gradient(circle at 9px 50%,#2b0509 0 3.6px,rgba(0,0,0,.35) 4.6px,transparent 6px),
+    radial-gradient(circle at 9px 84%,#2b0509 0 3.6px,rgba(0,0,0,.35) 4.6px,transparent 6px),
+    linear-gradient(to right,rgba(35,15,6,.30),transparent 8%);
+}
+.leaf-img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;user-select:none;-webkit-user-drag:none}
+.leaf-open{position:absolute;inset:0;z-index:3;background:transparent;border:0;padding:0;cursor:zoom-in;-webkit-appearance:none;appearance:none}
+.leaf-open:focus-visible{outline-offset:-4px}
+.leaf-status{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:12%;font-size:13px;color:var(--ink-soft);z-index:2}
+.leaf-status button{font:600 12px var(--ui);padding:9px 14px;border:1px solid var(--paper-3);background:#fffdf7;border-radius:3px;cursor:pointer;box-shadow:1px 2px 0 rgba(0,0,0,.18)}
+.spinner{width:22px;height:22px;border-radius:50%;border:2px solid var(--paper-3);border-top-color:var(--red-600);animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* "To Be Created" sheet */
+.tbc{position:absolute;inset:0;padding:11% 11% 9% 13%;display:flex;flex-direction:column;z-index:1}
+.tbc .grid{position:absolute;inset:0;opacity:.24;
+  background-image:linear-gradient(rgba(63,111,147,.14) 1px,transparent 1px),linear-gradient(90deg,rgba(63,111,147,.14) 1px,transparent 1px);
+  background-size:calc(var(--lw)/16) calc(var(--lw)/16);
+  -webkit-mask-image:linear-gradient(160deg,transparent 30%,#000 100%);mask-image:linear-gradient(160deg,transparent 30%,#000 100%)}
+.tbc-date{font:500 calc(var(--lw)*.030)/1.2 var(--cond);color:var(--ink-soft);letter-spacing:.06em;position:relative}
+.tbc h2{
+  margin:calc(var(--lw)*.05) 0 calc(var(--lw)*.03);position:relative;
+  font:400 calc(var(--lw)*.16)/.98 var(--marker);color:#2a2724;letter-spacing:.01em;transform:rotate(-2.2deg);transform-origin:left;
+  text-shadow:.6px .6px 0 rgba(0,0,0,.35);
+}
+.tbc h2 span{display:block;color:var(--red-600);opacity:.9}
+.tbc-note{position:relative;font:700 calc(var(--lw)*.062)/1.15 var(--hand);color:#37393d;margin:0 0 calc(var(--lw)*.04);transform:rotate(-1deg)}
+.tbc-list{list-style:none;margin:0;padding:0;position:relative;display:grid;gap:calc(var(--lw)*.028)}
+.tbc-list li{display:flex;align-items:center;gap:.6em;font:700 calc(var(--lw)*.056)/1.1 var(--hand);color:#3a3c40}
+.tbc-list i{flex:none;width:calc(var(--lw)*.048);height:calc(var(--lw)*.048);border:1.6px solid #4a4d52;border-radius:2px;background:rgba(255,255,255,.35)}
+.tbc-sketch{position:absolute;right:6%;bottom:8%;width:52%;opacity:.5;pointer-events:none}
+.tbc-stamp{position:absolute;right:9%;top:9%;font:400 calc(var(--lw)*.045)/1 var(--marker);color:var(--red-600);border:2px solid var(--red-600);padding:.35em .6em;border-radius:3px;transform:rotate(7deg);opacity:.72;mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='40'%3E%3Cfilter id='f'%3E%3CfeTurbulence baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -2.2 2.1'/%3E%3C/filter%3E%3Crect width='60' height='40' filter='url(%23f)'/%3E%3C/svg%3E");-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='40'%3E%3Cfilter id='f'%3E%3CfeTurbulence baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -2.2 2.1'/%3E%3C/filter%3E%3Crect width='60' height='40' filter='url(%23f)'/%3E%3C/svg%3E")}
+.leaf-ruled{position:absolute;inset:0;
+  background:repeating-linear-gradient(transparent 0 calc(var(--lw)*.075 - 1px),rgba(63,111,147,.22) calc(var(--lw)*.075 - 1px) calc(var(--lw)*.075));
+  background-position:0 calc(var(--lw)*.12)}
+.leaf-back-paper{position:absolute;inset:0;background:linear-gradient(120deg,rgba(255,255,255,.22),rgba(0,0,0,.06))}
+
+/* corner "peel" affordances (also the grab handles for dragging) */
+.peel{
+  position:absolute;z-index:9;bottom:0;width:15%;height:10%;min-width:54px;min-height:54px;padding:0;border:0;
+  background:transparent;cursor:grab;touch-action:none;-webkit-appearance:none;appearance:none;
+}
+.peel.right{right:0}.peel.left{left:0}
+.peel::before{
+  content:"";position:absolute;bottom:0;width:26px;height:26px;transition:width .25s var(--ease),height .25s var(--ease);
+  background:linear-gradient(var(--peel-dir,315deg),transparent 46%,rgba(0,0,0,.24) 47%,#e7e0cf 52%,#f7f2e6 100%);
+  box-shadow:-3px -3px 6px rgba(0,0,0,.16);
+}
+.peel.right::before{right:0;--peel-dir:315deg;border-radius:100% 0 0 0}
+.peel.left::before{left:0;--peel-dir:45deg;border-radius:0 100% 0 0;box-shadow:3px -3px 6px rgba(0,0,0,.16)}
+.peel:hover::before,.peel:focus-visible::before{width:42px;height:42px}
+.peel:active{cursor:grabbing}
+.peel[disabled]{display:none}
+
+/* ---------- 6. page-flip layers ---------- */
+.flipper{position:absolute;top:0;height:var(--lh);width:var(--lw);z-index:8;transform-style:preserve-3d;pointer-events:none;will-change:transform}
+.seg{position:absolute;top:0;height:100%;transform-style:preserve-3d;will-change:transform}
+.face{position:absolute;inset:0;overflow:hidden;backface-visibility:hidden;-webkit-backface-visibility:hidden;background:var(--paper)}
+.face.back{transform:rotateY(180deg)}
+.face .leaf{width:var(--lw);height:100%;inset:auto;top:0}
+.face .shade{position:absolute;inset:0;background:#170a04;opacity:0;pointer-events:none;z-index:6}
+.face .sheen{position:absolute;inset:0;pointer-events:none;z-index:6;mix-blend-mode:soft-light;opacity:0;
+  background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.9) 50%,transparent 70%)}
+.cast{position:absolute;top:0;height:100%;z-index:7;pointer-events:none;opacity:0}
+.cast.r{background:linear-gradient(to right,rgba(15,6,2,.55),rgba(15,6,2,.22) 40%,transparent)}
+.cast.l{background:linear-gradient(to left,rgba(15,6,2,.5),rgba(15,6,2,.2) 40%,transparent)}
+
+.hint{
+  position:absolute;left:50%;bottom:calc(var(--mb) + 10px);transform:translate(-50%,6px);z-index:12;
+  font:600 12px var(--ui);padding:6px 12px;border-radius:3px;background:#f6f1e5;color:var(--ink);
+  box-shadow:2px 3px 3px rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;white-space:nowrap
+}
+.hint.on{opacity:1;transform:translate(-50%,0)}
+
+/* ---------- 7. rings, sticker, control bar, index tabs ---------- */
+.rings{position:absolute;z-index:6;left:50%;top:var(--mt);height:var(--lh);width:0;pointer-events:none;transition:opacity .4s}
+.binder[data-mode="single"] .rings{left:calc(var(--ms) + 16px)}
+.rail{position:absolute;left:-4px;top:-14px;bottom:-14px;width:8px;border-radius:4px;
+  background:linear-gradient(90deg,#fff 0%,var(--steel-2) 35%,var(--steel-3) 70%,var(--steel-4) 100%);
+  box-shadow:1px 1px 3px rgba(0,0,0,.45),inset 0 0 0 1px rgba(0,0,0,.25)}
+.ring{position:absolute;left:-19px;width:38px;height:13px;transform:translateY(-50%);filter:var(--sh-2)}
+.ring svg{display:block;width:100%;height:100%;overflow:visible}
+.binder[data-mode="single"] .ring{left:-8px;width:30px}
+
+.sticker{position:absolute;z-index:6;left:calc(var(--ms) + 6px);top:6px;width:min(300px,calc(var(--lw)*.9));aspect-ratio:300/78;
+  transform:rotate(-1.6deg);filter:var(--sh-2);transition:width .3s var(--ease),left .3s var(--ease),top .3s var(--ease),transform .25s var(--ease),opacity .4s;cursor:pointer}
+.sticker:hover{transform:rotate(-1deg) translateY(-1px)}
+.sticker svg{width:100%;height:100%;display:block;overflow:visible}
+/* Smaller once the binder is open — it only needs to read as a tab/close
+   control now, not dominate the top margin above the pages. */
+.binder[data-state="open"] .sticker{left:50%;top:9px;width:148px;transform:translateX(-50%) rotate(-1.2deg)}
+.binder[data-state="open"] .sticker:hover{transform:translateX(-50%) rotate(-.6deg) translateY(-1px)}
+
+.b-bar{
+  position:absolute;z-index:5;left:var(--ms);right:var(--ms);bottom:0;height:var(--mb);
+  display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 4px;color:#f4dcd6;transition:opacity .4s;
+}
+.b-group{display:flex;align-items:center;gap:8px;min-width:0}
+.b-label{font:600 14px/1 var(--cond);letter-spacing:.03em;color:#f6e3dd;text-shadow:0 -1px 0 rgba(0,0,0,.45),0 1px 0 rgba(255,150,150,.2);white-space:nowrap}
+.b-title{font:500 12.5px/1.2 var(--cond);letter-spacing:.02em;color:#e9c9c3;text-align:center;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  text-shadow:0 -1px 0 rgba(0,0,0,.4)}
+.key{
+  /* physical push-button: metal cap that depresses */
+  position:relative;min-width:42px;height:38px;padding:0 12px;border:0;border-radius:5px;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  font:600 12.5px/1 var(--cond);letter-spacing:.03em;color:#26282a;
+  background:linear-gradient(160deg,#fbfcfc 0%,var(--steel-2) 45%,#9aa1a6 100%);
+  box-shadow:inset 1px 1px 0 rgba(255,255,255,.9),inset -1px -1px 0 rgba(0,0,0,.25),1px 2px 0 #5c1220,2px 4px 3px rgba(0,0,0,.45);
+  transition:transform .09s,box-shadow .09s;
+}
+button.key svg,a.key svg{width:17px;height:17px;flex:none}
+.key:hover:not(:disabled){filter:brightness(1.05)}
+.key:active:not(:disabled){transform:translate(1px,2px);box-shadow:inset 1px 1px 0 rgba(255,255,255,.6),inset -1px -1px 0 rgba(0,0,0,.3),0 0 0 #5c1220,0 1px 2px rgba(0,0,0,.4)}
+.key:disabled{opacity:.42;cursor:default;box-shadow:inset 1px 1px 0 rgba(255,255,255,.6),1px 2px 0 #5c1220}
+.key.sq{width:42px;padding:0}
+.page-count{min-width:82px;text-align:center}
+
+/* ---------- issue navigation: year tag + 12-month index tabs ----------
+   Styled as the same desk-stationery language as the rest of the scene —
+   torn kraft-paper flags with a strip of tape and a hand-marker label,
+   sticking out from the binder's edge like real plastic page dividers. */
+.tabs{position:absolute;z-index:5;left:calc(100% - var(--tabs-gutter) - 4px);top:46px;width:82px;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+.year-select{
+  width:74px;height:36px;margin-left:8px;padding:0 8px 0 10px;border:0;cursor:pointer;
+  appearance:none;-webkit-appearance:none;
+  font:400 20px/34px var(--marker);letter-spacing:.01em;color:var(--red-700);text-align:center;
+  background:
+    linear-gradient(90deg,rgba(0,0,0,.16),transparent 26%),
+    linear-gradient(160deg,#fbf6e8,#ecdfc2);
+  clip-path:polygon(0 10%,94% 0,100% 22%,100% 88%,92% 100%,0 92%);
+  box-shadow:inset 0 0 0 1px rgba(80,50,20,.12),2px 4px 5px rgba(0,0,0,.4);
+  transform:rotate(-2deg);transition:transform .2s var(--ease)}
+.year-select:hover{transform:rotate(-1deg) translateX(2px)}
+.year-select::before{content:"";position:absolute} /* keep stacking context simple */
+.month-tabs{display:flex;flex-direction:column;gap:6px}
+.tab.month-tab{
+  position:relative;display:block;width:70px;height:34px;margin-left:12px;padding:0;border:0;cursor:pointer;
+  text-align:center;color:#fbf5e6;
+  background:
+    linear-gradient(90deg,rgba(0,0,0,.30),transparent 24%),
+    linear-gradient(155deg,var(--tab,#6b4b63),color-mix(in srgb,var(--tab,#6b4b63) 62%,#1a1210));
+  clip-path:polygon(0 14%,90% 0,100% 20%,100% 82%,88% 100%,0 88%);
+  box-shadow:inset 1px 1px 0 rgba(255,255,255,.22),2px 3px 4px rgba(0,0,0,.42);
+  transform:translateX(-10px) rotate(-.6deg);
+  transition:transform .2s var(--ease),filter .2s,opacity .2s}
+/* little strip of tape pinning each flag to the binder edge */
+.tab.month-tab::before{
+  content:"";position:absolute;left:10px;top:-6px;width:22px;height:12px;
+  background:rgba(241,234,216,.55);border:1px solid rgba(0,0,0,.06);
+  box-shadow:0 1px 2px rgba(0,0,0,.25);transform:rotate(-4deg);pointer-events:none}
+.tab.month-tab:hover:not(:disabled){transform:translateX(-3px) rotate(-.6deg)}
+.tab.month-tab[aria-current="true"]{
+  transform:translateX(5px) rotate(-.6deg) scale(1.04);
+  filter:brightness(1.1);
+  box-shadow:inset 1px 1px 0 rgba(255,255,255,.3),3px 5px 8px rgba(0,0,0,.5),0 0 0 2px rgba(246,241,229,.65)}
+.tab.month-tab:disabled{
+  color:transparent;cursor:default;opacity:.85;
+  background:repeating-linear-gradient(-45deg,rgba(255,255,255,.4) 0 5px,rgba(0,0,0,.05) 5px 10px),linear-gradient(160deg,#efe6d2,#ddd0b4);
+  box-shadow:inset 0 0 0 1px rgba(80,50,20,.14),1px 2px 3px rgba(0,0,0,.28)}
+.tab.month-tab:disabled span{color:rgba(80,60,40,.55);text-shadow:none}
+.tab.month-tab span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:400 15px/1 var(--marker);letter-spacing:.02em;text-shadow:0 1px 0 rgba(0,0,0,.4)}
+.tab:nth-child(1){--tab:#4d6a57}.tab:nth-child(2){--tab:#a05a2c}.tab:nth-child(3){--tab:#8c1727}.tab:nth-child(4){--tab:#3f6f93}.tab:nth-child(5){--tab:#6b4b63}.tab:nth-child(6){--tab:#5d6b45}.tab:nth-child(7){--tab:#a3782e}.tab:nth-child(8){--tab:#4d6a57}.tab:nth-child(9){--tab:#a05a2c}.tab:nth-child(10){--tab:#8c1727}.tab:nth-child(11){--tab:#3f6f93}.tab:nth-child(12){--tab:#6b4b63}
+
+/* outside front cover (closed state + opening animation) */
+.lid{
+  position:absolute;z-index:14;right:0;top:0;bottom:0;width:50%;transform-origin:0 50%;transform-style:preserve-3d;
+  transform:rotateY(0);cursor:pointer;
+}
+.binder[data-mode="single"] .lid{width:100%}
+.lid-face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:3px 9px 9px 3px;overflow:hidden}
+.lid-face.front{
+  background:
+    radial-gradient(ellipse at 22% 12%,rgba(255,215,210,.35),transparent 55%),
+    url(../assets/textures/cover-grain.webp) 0 0/230px auto,
+    linear-gradient(135deg,var(--red-500),var(--red-700) 60%,var(--red-900));
+  background-blend-mode:normal,soft-light,normal;
+  box-shadow:inset 2px 2px 0 rgba(255,200,200,.32),inset -2px -2px 0 rgba(0,0,0,.35);
+}
+.lid-face.back{
+  transform:rotateY(180deg);border-radius:9px 3px 3px 9px;
+  background:url(../assets/textures/cover-grain.webp) 0 0/230px auto,linear-gradient(135deg,var(--red-600),var(--red-800) 70%,var(--red-900));
+  background-blend-mode:soft-light,normal;
+}
+.lid-face .shade{position:absolute;inset:0;background:#120404;opacity:0;pointer-events:none}
+.lid-hinge{position:absolute;left:0;top:0;bottom:0;width:26px;background:linear-gradient(90deg,rgba(0,0,0,.42),rgba(0,0,0,.10) 60%,transparent);pointer-events:none}
+.lid-sticker{position:absolute;left:8%;top:26%;width:86%;aspect-ratio:300/78;transform:rotate(-4deg);filter:var(--sh-2)}
+.lid-sticker svg{width:100%;height:100%;display:block;overflow:visible}
+.lid-label{
+  position:absolute;left:12%;right:12%;bottom:14%;padding:14px 12px 12px;text-align:center;
+  background:linear-gradient(160deg,#fbf7ec,#e7dfcb);color:var(--ink);border-radius:3px;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.18),0 0 0 4px #b8bdc1,0 0 0 5px rgba(0,0,0,.35),3px 5px 5px rgba(0,0,0,.4);
+}
+.lid-label b{display:block;font:600 calc(var(--lw)*.078)/1 var(--cond);letter-spacing:.05em}
+.lid-label small{display:block;margin-top:6px;font:500 calc(var(--lw)*.036)/1.2 var(--ui);color:var(--ink-soft)}
+.lid-open{position:absolute;right:12px;top:12px;z-index:3;font:600 11.5px var(--cond);letter-spacing:.06em;color:#f7dcd6;padding:7px 10px;border:0;background:rgba(0,0,0,.28);border-radius:3px;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(255,255,255,.2)}
+.binder:not([data-state="closed"]) .lid-open{display:none}
+
+/* ---------- 8. desk props (all share the same light + shadow tokens) ---------- */
+.props-left,.props-right{position:relative;pointer-events:none;z-index:1}
+/* left: decorative desk objects + the credits card, positioned inside a column
+   that is exactly as tall as the binder (a few px of it tucks under the cover) */
+.props-left{align-self:stretch;width:230px;margin-right:-30px}
+/* right: quote note, then suggestion slips — stacked IN FLOW, so they can never
+   collide with each other or with the month tabs */
+.props-right{width:210px;display:flex;flex-direction:column;align-items:flex-start;gap:34px;padding-top:6px}
+.prop{position:absolute;pointer-events:auto}
+.props-right .prop{position:relative;inset:auto;flex:none}
+.prop svg{display:block;width:100%;height:auto;overflow:visible}
+.prop.art{filter:var(--sh-2);transition:transform .35s var(--ease)}
+.prop.art:hover{transform:translate(-1px,-3px) rotate(var(--r-hover,0deg))}
+
+.blueprint{left:2px;top:1%;width:210px;--r:-6deg;transform:rotate(var(--r));--r-hover:-4deg;filter:var(--sh-2)}
+.ruler{left:-10px;top:60%;width:34px;transform-origin:0 0;transform:rotate(-90deg) translate(-100%,0);width:210px;opacity:.92;--r-hover:0deg}
+.pencil{left:6px;bottom:1%;width:186px;transform:rotate(-31deg);z-index:4}
+.pen{left:26px;bottom:-1%;width:168px;transform:rotate(-22deg);z-index:3}
+.clip{width:30px}
+.clip.c1{right:-6px;top:36%;transform:rotate(14deg);z-index:5}
+.clip.c2{right:26px;top:-1.6%;transform:rotate(-8deg);z-index:6}
+
+.card-index{
+  position:absolute;left:8px;top:27%;width:186px;padding:22px 14px 14px;transform:rotate(2.4deg);
+  background:repeating-linear-gradient(transparent 0 21px,rgba(63,111,147,.28) 21px 22px) 0 26px/100% 100% no-repeat,linear-gradient(160deg,#fbf8ef,#ece5d3);
+  box-shadow:inset 1px 1px 0 var(--edge-hi),inset -1px -1px 0 rgba(0,0,0,.12),3px 5px 4px rgba(22,9,4,.4),6px 10px 10px rgba(22,9,4,.22);
+  border-top:8px solid var(--red-600);font:500 12px/22px var(--ui);color:var(--ink)
+}
+.card-index h3{margin:0 0 2px;font:600 12.5px/1.25 var(--cond);letter-spacing:.03em;color:var(--red-700)}
+.card-index p{margin:0}
+.card-index dl{margin:6px 0 0}
+.card-index dt{font:600 10.5px/16px var(--cond);color:var(--ink-soft);letter-spacing:.06em;text-transform:uppercase}
+.card-index dd{margin:0 0 3px;font:400 13px/18px var(--hand);font-size:17px;font-weight:700;color:#27313c}
+.card-index .clip{position:absolute;left:auto;right:8px;top:-18px;bottom:auto;width:24px;height:56px;filter:var(--sh-1);z-index:2}
+
+/* quote-of-the-day sticky note */
+.sticky{
+  margin-left:6px;width:184px;height:184px;padding:0;border:0;text-align:left;cursor:pointer;
+  transform:rotate(-3deg);transform-origin:50% 0;transition:transform .35s var(--ease);
+  background:transparent;filter:var(--sh-2);
+}
+.sticky:hover{transform:rotate(-1.6deg) translateY(-2px)}
+.sticky-paper{
+  position:absolute;inset:0;padding:22px 16px 14px;display:flex;flex-direction:column;justify-content:flex-start;
+  background:linear-gradient(180deg,rgba(0,0,0,.09) 0,transparent 18px),linear-gradient(155deg,#f4de78,var(--note) 40%,var(--note-2));
+  clip-path:polygon(0 0,100% 0,100% calc(100% - 26px),calc(100% - 26px) 100%,0 100%);
+}
+.sticky-curl{position:absolute;right:0;bottom:0;width:26px;height:26px;background:linear-gradient(135deg,#cbb03a 0%,#e9d472 55%,#f4e392 100%);box-shadow:-2px -2px 3px rgba(0,0,0,.22);border-radius:0 0 0 0}
+.sticky .lbl{font:400 12.5px/1 var(--marker);color:var(--red-700);letter-spacing:.03em;margin-bottom:6px;transform:rotate(-1.5deg)}
+.sticky .q{font:700 21px/1.03 var(--hand);color:#2f2b22;flex:1;display:block;overflow:hidden}
+.sticky .q.long{font-size:18.5px}
+.sticky.peel-anim .sticky-paper{animation:notepeel .55s var(--ease)}
+@keyframes notepeel{0%{transform:none}35%{transform:translate(-3px,-8px) rotate(-2.5deg) scale(1.03)}100%{transform:none}}
+
+/* suggestion slips */
+.slips{width:210px}
+.slips-title{margin:0 0 12px 4px;font:400 15px/1 var(--marker);letter-spacing:.03em;color:#f6e2cc;text-shadow:0 2px 3px rgba(0,0,0,.65);transform:rotate(-1.5deg);transform-origin:left}
+.slip{
+  position:relative;display:block;margin:0 0 -6px;padding:15px 12px 10px;
+  background:repeating-linear-gradient(transparent 0 19px,rgba(63,111,147,.24) 19px 20px) 0 22px/100% 100% no-repeat,linear-gradient(160deg,#fcf9f1,#eee7d6);
+  border-top:6px solid var(--red-500);
+  box-shadow:inset 1px 1px 0 var(--edge-hi),2px 3px 3px rgba(22,9,4,.4);
+  font:700 17.5px/20px var(--hand);color:#2a3138;word-break:break-word;
+}
+.slip:nth-child(1){transform:rotate(-1.8deg)}.slip:nth-child(2){transform:rotate(1.4deg) translateX(6px)}.slip:nth-child(3){transform:rotate(-.6deg) translateX(-4px)}
+.slip small{display:block;margin-top:2px;font:500 11px/1.2 var(--cond);color:var(--ink-soft);letter-spacing:.03em}
+.slip.empty{color:#6d6a63;font-weight:400}
+.slips .key{margin-top:16px;height:34px}
+.slips-hint{margin:6px 0 0;font:500 11px/1.3 var(--ui);color:#f0dcc8;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+
+/* ---------- 9. dialogs / toast / reader ---------- */
+dialog{border:0;padding:0;background:transparent;max-width:100vw;max-height:100dvh;color:var(--ink)}
+dialog::backdrop{background:rgba(18,8,3,.78);backdrop-filter:blur(2px)}
+.reader{width:min(1100px,100vw);height:100dvh;margin:auto;display:flex;flex-direction:column;background:#1d120c;box-shadow:0 0 0 1px rgba(255,255,255,.1)}
+.reader-bar{display:flex;align-items:center;gap:8px;padding:8px 10px;background:linear-gradient(180deg,var(--red-800),var(--red-900));color:#f6e0da;flex:none}
+.reader-bar h2{margin:0 auto 0 4px;font:600 15px/1.2 var(--cond);letter-spacing:.03em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.reader-bar .key{height:34px;min-width:36px}
+.reader-body{flex:1;min-height:0;overflow:auto;background:#2a1a10 url(../assets/textures/paper-grain.webp);background-blend-mode:multiply;display:grid;place-items:start center;padding:14px;cursor:grab;-webkit-overflow-scrolling:touch}
+.reader-body img{display:block;height:auto;background:#fff;box-shadow:3px 6px 14px rgba(0,0,0,.55);max-width:none;transition:width .18s var(--ease)}
+.reader-text{flex:none;max-height:38%;overflow:auto;background:var(--paper);padding:14px 18px 18px;font:400 14.5px/1.55 var(--ui);border-top:4px solid var(--red-600)}
+.reader-text h3{margin:0 0 8px;font:600 15px var(--cond);letter-spacing:.03em;color:var(--red-700)}
+.reader-text h4{margin:12px 0 2px;font:600 14px var(--ui)}
+.reader-text p{margin:0 0 4px;max-width:78ch}
+.reader-text .credits{margin-top:14px;padding-top:10px;border-top:1px dashed var(--paper-3);color:var(--ink-soft);font-size:13px}
+
+.paper-dialog{width:min(420px,calc(100vw - 28px));margin:auto}
+.paper-form{position:relative;padding:26px 22px 20px;background:repeating-linear-gradient(transparent 0 27px,rgba(63,111,147,.22) 27px 28px) 0 48px/100% 100% no-repeat,linear-gradient(160deg,#fcf9f1,#eee7d6);
+  border-top:10px solid var(--red-600);box-shadow:4px 8px 24px rgba(0,0,0,.55);transform:rotate(-.6deg)}
+.paper-form h2{margin:0 0 4px;font:400 22px/1.1 var(--marker);color:var(--red-700)}
+.paper-form p.sub{margin:0 0 14px;font:500 13px/1.4 var(--ui);color:var(--ink-soft)}
+.paper-form label{display:block;margin:0 0 10px;font:600 12px var(--cond);letter-spacing:.05em;color:var(--ink-soft)}
+.paper-form input[type=text],.paper-form textarea{display:block;width:100%;margin-top:4px;padding:9px 10px;font:500 15px/1.4 var(--ui);color:var(--ink);background:rgba(255,255,255,.75);border:1px solid var(--paper-3);border-radius:3px}
+.paper-form textarea{min-height:104px;resize:vertical}
+.paper-form .row{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;align-items:center}
+.paper-form .count{margin-right:auto;font:500 12px var(--ui);color:var(--ink-soft)}
+.paper-form .msg{margin:8px 0 0;min-height:1.3em;font:500 13px var(--ui)}
+.paper-form .msg.err{color:#a3172a}.paper-form .msg.ok{color:#2c6a3d}
+.paper-form .hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+.btn{padding:10px 16px;border-radius:4px;border:1px solid rgba(0,0,0,.25);font:600 13.5px var(--ui);cursor:pointer;background:#f3eee1;box-shadow:1px 2px 0 rgba(0,0,0,.25)}
+.btn:active{transform:translate(1px,2px);box-shadow:none}
+.btn.primary{background:var(--red-600);color:#fff;border-color:var(--red-800)}
+.btn:disabled{opacity:.55;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:18px;transform:translate(-50%,20px);z-index:50;max-width:min(92vw,460px);padding:10px 16px;border-radius:4px;background:#f6f1e5;color:var(--ink);font:500 14px/1.35 var(--ui);box-shadow:3px 6px 14px rgba(0,0,0,.5);border-left:5px solid var(--red-600);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+.noscript{position:fixed;inset:0;display:grid;place-items:center;background:#3a2213;color:#f6e3dd;font:500 16px var(--ui);padding:24px;text-align:center}
+
+/* ---------- 10. responsive ----------
+   Four layouts, each one guaranteed to fit its viewport (no overlap, no clipping):
+     >= 1280px   three columns  [desk props | binder + month tabs | quote + suggestions]
+     1024-1279   two columns    [binder + month tabs | quote + suggestions]
+      901-1023   stacked        binder + month tabs, quote + suggestions underneath
+     <= 900      phone/tablet   single page, month index sits ABOVE the binder in normal flow
+   The two-page spread scales (--lw) to whatever width is left after the columns and
+   gutters are subtracted, and on desktop also to the window height so the whole
+   binder is visible without scrolling. */
+@media (min-width:1024px){
+  /* desk objects (pen, pencil, ruler) may hang past the desk edge: clip them
+     instead of letting them create a scrollbar that the layout never asked for */
+  .desk{overflow:hidden}
+}
+@media (min-width:1280px){
+  .binder-zone{--lw:clamp(320px,calc((100vw - 630px)/2),414px)}
+}
+@media (min-width:1024px) and (max-width:1279px){
+  .rig{grid-template-columns:auto auto}
+  .props-left{display:none}
+  .binder-zone{--lw:clamp(300px,calc((100vw - 420px)/2),414px)}
+}
+@media (min-width:901px) and (max-width:1023px){
+  .desk{align-content:start;padding-top:20px}
+  .rig{display:flex;flex-direction:column;align-items:center;width:auto}
+  .props-left{display:none}
+  .props-right{width:min(760px,100%);flex-direction:row;flex-wrap:wrap;justify-content:center;align-items:flex-start;gap:28px;margin-top:34px;padding-bottom:28px}
+  .binder-zone{--lw:clamp(300px,calc((100vw - 190px)/2),414px)}
+}
+/* also fit the window height on desktop (dvh-capable browsers only) */
+@supports (height:100dvh){
+  @media (min-width:1280px){
+    .binder-zone{--lw:clamp(320px,min(calc((100vw - 630px)/2),calc((100dvh - 190px)/1.5459)),414px)}
+  }
+  @media (min-width:1024px) and (max-width:1279px){
+    .binder-zone{--lw:clamp(300px,min(calc((100vw - 420px)/2),calc((100dvh - 190px)/1.5459)),414px)}
+  }
+}
+
+@media (max-width:900px){
+  .desk{
+    align-content:start;
+    padding:calc(14px + env(safe-area-inset-top,0px)) max(8px,env(safe-area-inset-right,0px)) calc(26px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));
+  }
+  .rig{display:flex;flex-direction:column;align-items:center;width:100%}
+  .props-left{display:none}
+  .binder-zone{
+    --lw:min(360px,calc(100vw - 64px));--ms:12px;--mt:60px;--mb:66px;
+    padding-right:0;display:flex;flex-direction:column;align-items:center;
+  }
+  .binder{flex:none}
+
+  /* Month index: a normal in-flow strip ABOVE the binder (never positioned outside
+     the page, so it can't be clipped). Year tag on the left, 6 x 2 month flags. */
+  .tabs{
+    position:relative;left:auto;top:auto;order:-1;
+    width:calc(var(--lw) + var(--ms)*2 + 16px);margin:0 0 14px;
+    display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:10px;
+  }
+  .year-select{width:60px;height:36px;margin:0;font-size:17px;line-height:34px;padding:0 6px}
+  .month-tabs{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px 5px}
+  .tab.month-tab{
+    width:auto;height:34px;margin:0;transform:none;
+    clip-path:polygon(0 14%,88% 0,100% 22%,100% 84%,90% 100%,0 88%);
+  }
+  .tab.month-tab::before{left:50%;top:-4px;width:16px;height:8px;transform:translateX(-50%) rotate(-3deg)}
+  .tab.month-tab:hover:not(:disabled),.tab.month-tab[aria-current="true"]{transform:scale(1.06)}
+  .tab.month-tab span{font-size:13px}
+
+  /* closing-sticker: centred over the binder's top margin */
+  .binder[data-state="open"] .sticker{width:148px;top:10px}
+
+  .b-title{display:none}
+  .b-bar{gap:6px}
+  .key{min-width:44px;height:44px}
+  .key .txt{display:none}
+  .page-count{min-width:64px}
+  .props-right{width:min(760px,100%);flex-direction:row;flex-wrap:wrap;justify-content:center;align-items:flex-start;gap:28px;margin-top:34px;padding-top:0;padding-bottom:12px}
+  .peel{min-width:64px;min-height:64px}
+  .pencil{display:none}
+  .lid-open{display:block}
+}
+@media (max-width:420px){
+  .props-right{gap:22px}
+  .tabs{gap:8px}
+  .year-select{width:54px;font-size:16px}
+}
+@media (max-width:340px){
+  .tab.month-tab span{font-size:12px}
+}
+@media (hover:none){
+  .peel::before{width:34px;height:34px}
+}
+
+/* ---------- 11. reduced motion ---------- */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
+}
+
+/* ---------- 12. interaction polish ---------- */
+.reader-body{overscroll-behavior:contain;touch-action:pan-x pan-y;}
+.reader-body img{transition:width .12s var(--ease);}
+
+/* ---------- 13. closed-cover art: match the physical mockup language ---------- */
+.lid-gear{position:absolute;left:6%;top:4%;width:12%;aspect-ratio:1;display:grid;place-items:center;padding:7px;background:#eee6d5;clip-path:polygon(7% 12%,86% 0,100% 86%,15% 100%);filter:var(--sh-1);transform:rotate(-7deg)}
+.lid-gear svg{width:78%;height:78%;display:block}
+.lid-open-note{position:absolute;right:5%;top:4%;z-index:2;padding:10px 13px 8px;background:#f5eddf;color:#302b26;font:600 11px/1 var(--cond);letter-spacing:.04em;transform:rotate(-4deg);box-shadow:var(--sh-1);clip-path:polygon(3% 8%,96% 0,100% 88%,5% 100%)}
+.lid-open-note span{font-size:15px;margin-left:8px}
+.lid-open{position:absolute;right:5%;top:4%;width:25%;height:8%;z-index:3;opacity:0;cursor:pointer}
+.lid-sticker{left:7%;top:25%;width:86%;transform:rotate(-2.5deg)}
+.lid-note{position:absolute;z-index:2;padding:9px 12px;background:#eee5d3;color:#292722;font:700 15px/1.02 var(--hand);box-shadow:var(--sh-1);clip-path:polygon(2% 4%,96% 0,100% 92%,4% 100%)}
+.lid-note-a{left:9%;bottom:44%;transform:rotate(-3deg)}
+/* "Small Steps, Big Impact" reads as a folded red ribbon banner, echoing
+   the marker-burst/dimension-line language of the METP sticker itself. */
+.lid-note.ribbon{
+  right:6%;bottom:8%;padding:9px 20px 9px 16px;background:linear-gradient(160deg,var(--red-500),var(--red-700));
+  color:#fbf1ea;font:700 15px/1.05 var(--hand);text-shadow:0 1px 0 rgba(0,0,0,.3);
+  clip-path:polygon(0 0,88% 0,100% 50%,88% 100%,0 100%,8% 50%);
+  box-shadow:var(--sh-1),inset 0 0 0 1px rgba(255,255,255,.14);transform:rotate(3deg)
+}
+/* dashed rubber-stamp seal, sitting between the two notes */
+.lid-stamp{position:absolute;right:11%;top:44%;z-index:2;width:19%;aspect-ratio:1;color:#f6dcd6;opacity:.85;transform:rotate(9deg);filter:var(--sh-1)}
+.lid-stamp svg{width:100%;height:100%;display:block;overflow:visible}
+.lid-stamp text{fill:currentColor;font-weight:400}
+/* torn contact-sheet photo of the plant, pinned like the rest of the desk clippings */
+.lid-photo{position:absolute;left:54%;bottom:34%;z-index:2;width:26%;transform:rotate(4deg);filter:var(--sh-2)}
+.lid-photo svg:first-child{width:100%;height:auto;display:block;
+  clip-path:polygon(3% 6%,80% 0,100% 12%,97% 92%,22% 100%,0 88%);
+  box-shadow:0 0 0 5px #f3ede0,0 0 0 6px rgba(0,0,0,.12)}
+.lid-photo .clip{position:absolute;left:-10%;top:-22%;width:34%;color:var(--steel-3);filter:var(--sh-1)}
+.lid-mini{position:absolute;left:9%;bottom:7%;z-index:2;color:#e8d6cf;font:600 8px/1.15 var(--cond);letter-spacing:.08em;transform:rotate(-2deg);opacity:.88}
+/* "Engineering · Planning · Innovation" reads as its own torn kraft tag with a globe mark */
+.lid-mini.tag{
+  display:flex;align-items:center;gap:7px;padding:7px 12px 7px 9px;opacity:1;color:#2a2724;
+  background:linear-gradient(160deg,#f2ecdd,#e3d9bf);
+  clip-path:polygon(2% 10%,92% 0,100% 86%,8% 100%);box-shadow:var(--sh-1)
+}
+.lid-mini.tag .tag-globe{width:16px;height:16px;flex:none;color:var(--blue)}
+.lid-mini.tag span{font:600 8px/1.2 var(--cond);letter-spacing:.07em}
+.lid-label{left:11%;right:11%;bottom:29%;padding:0;background:transparent;border:0;box-shadow:none;transform:rotate(-1deg);display:none}
+@media (max-width:900px){
+  .lid-gear{width:14%}.lid-open-note{font-size:10px;padding:8px 10px}.lid-sticker{top:24%;width:90%}.lid-note{font-size:13px}.lid-label{display:none}
+  .lid-stamp{width:22%;right:9%}.lid-photo{width:30%;left:52%}
+}
