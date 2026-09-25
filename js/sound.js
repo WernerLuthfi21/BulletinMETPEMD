@@ -207,11 +207,25 @@
     }
   }
 
+  // Cover photo stickers: tap one for a little pop/wiggle, like pressing a
+  // real sticker down onto the binder.
+  function initRealStickers() {
+    document.querySelectorAll(".lid-realsticker").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        btn.classList.remove("is-bouncing");
+        void btn.getBoundingClientRect(); // force reflow so the animation can restart
+        btn.classList.add("is-bouncing");
+      });
+      btn.addEventListener("animationend", () => btn.classList.remove("is-bouncing"));
+    });
+  }
+
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => { initMusicToggle(); initCoffeeCup(); });
+    document.addEventListener("DOMContentLoaded", () => { initMusicToggle(); initCoffeeCup(); initRealStickers(); });
   } else {
     initMusicToggle();
     initCoffeeCup();
+    initRealStickers();
   }
 
   M.sound = {
