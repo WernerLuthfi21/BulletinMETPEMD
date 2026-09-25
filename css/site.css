@@ -397,6 +397,22 @@ button.key svg,a.key svg{width:17px;height:17px;flex:none}
 .ruler{left:-10px;top:60%;width:34px;transform-origin:0 0;transform:rotate(-90deg) translate(-100%,0);width:210px;opacity:.92;--r-hover:0deg}
 .pencil{left:6px;bottom:1%;width:186px;transform:rotate(-31deg);z-index:4}
 .pen{left:26px;bottom:-1%;width:168px;transform:rotate(-22deg);z-index:3}
+
+/* coffee mug — desk accessory beside the binder, not on the cover */
+.coffee{width:104px}
+.coffee .coffee-liquid{transform-origin:50% 50%;animation:metp-coffee-shimmer 3.6s ease-in-out infinite}
+@keyframes metp-coffee-shimmer{0%,100%{transform:scaleX(1) scaleY(1)}50%{transform:scaleX(1.035) scaleY(.92)}}
+.coffee .steam{opacity:0;transform-origin:50% 100%;animation:metp-steam-rise 4s ease-out infinite}
+.coffee .s1{animation-duration:3.6s;animation-delay:.2s}
+.coffee .s2{animation-duration:4.2s;animation-delay:1.3s}
+.coffee .s3{animation-duration:3.9s;animation-delay:2.4s}
+@keyframes metp-steam-rise{
+  0%{opacity:0;transform:translateY(4px) translateX(0) scaleY(.8)}
+  20%{opacity:.6}
+  55%{opacity:.45;transform:translateY(-11px) translateX(2.5px) scaleY(1.05)}
+  85%{opacity:.15}
+  100%{opacity:0;transform:translateY(-24px) translateX(-2px) scaleY(1.2)}
+}
 .clip{width:30px}
 .clip.c1{right:-6px;top:36%;transform:rotate(14deg);z-index:5}
 .clip.c2{right:26px;top:-1.6%;transform:rotate(-8deg);z-index:6}

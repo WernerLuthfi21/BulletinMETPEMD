@@ -36,6 +36,12 @@
     <linearGradient id="g-curl" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#cfc8b6"/><stop offset=".6" stop-color="#f6f1e3"/><stop offset="1" stop-color="#ffffff"/>
     </linearGradient>
+    <linearGradient id="g-mug" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fffdf8"/><stop offset=".55" stop-color="#f3ede0"/><stop offset="1" stop-color="#d9d0bb"/>
+    </linearGradient>
+    <radialGradient id="g-coffee" cx=".38" cy=".32" r=".85">
+      <stop offset="0" stop-color="#8a5a35"/><stop offset=".55" stop-color="#5b3a22"/><stop offset="1" stop-color="#3a2415"/>
+    </radialGradient>
     <filter id="f-rough" x="-2%" y="-5%" width="104%" height="110%">
       <feTurbulence type="fractalNoise" baseFrequency=".05" numOctaves="2" seed="6" result="n"/>
       <feDisplacementMap in="SourceGraphic" in2="n" scale="2.6"/>
@@ -279,6 +285,23 @@
         <span class="sticky-paper"><span class="lbl">QUOTE OF THE DAY</span><span class="q" id="quoteText" aria-live="polite"></span></span>
         <span class="sticky-curl" aria-hidden="true"></span>
       </button>
+
+      <!-- desk accessory: a mug of coffee, sitting beside the binder, not on it -->
+      <div class="prop art coffee" aria-hidden="true">
+        <svg viewBox="0 0 150 148">
+          <ellipse cx="66" cy="130" rx="46" ry="8" fill="#000" opacity=".16"/>
+          <path d="M96 62 q30 6 30 27 q0 23 -27 25 l-1.5-11 q19 -2 19 -14 q0 -16 -21.5 -20 Z" fill="url(#g-mug)"/>
+          <path d="M96 62 q30 6 30 27 q0 23 -27 25 l-1.5-11 q19 -2 19 -14 q0 -16 -21.5 -20 Z" fill="url(#g-sheen)"/>
+          <path d="M27 40 L103 40 L96 122 Q95.5 131 86 131 L44 131 Q34.5 131 34 122 Z" fill="url(#g-mug)"/>
+          <path d="M27 40 L103 40 L100.5 74 L29.5 74 Z" fill="#fff" fill-opacity=".3"/>
+          <rect x="27" y="52" width="76" height="9" fill="#8c1727"/>
+          <ellipse cx="65" cy="40" rx="38" ry="8.5" fill="#e9e0cc"/>
+          <ellipse class="coffee-liquid" cx="65" cy="40" rx="31" ry="6" fill="url(#g-coffee)"/>
+          <path class="steam s1" d="M48 30 C43 20 52 15 47 4" stroke="#fff" stroke-width="3.4" stroke-linecap="round" fill="none"/>
+          <path class="steam s2" d="M65 30 C60 18 69 13 64 0" stroke="#fff" stroke-width="3.4" stroke-linecap="round" fill="none"/>
+          <path class="steam s3" d="M82 30 C77 20 86 15 81 4" stroke="#fff" stroke-width="3.4" stroke-linecap="round" fill="none"/>
+        </svg>
+      </div>
 
       <div class="prop slips" id="slips">
         <p class="slips-title" id="slipsTitle">Reader suggestions</p>
