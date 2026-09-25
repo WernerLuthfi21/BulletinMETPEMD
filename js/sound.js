@@ -58,39 +58,58 @@
   }
 
   // Background music toggle (separate from the synthesized effects above).
-  // Off by default; the visitor's choice is remembered in localStorage.
+  // On by default; the visitor's choice is remembered in localStorage.
+  // Browsers block audio-with-sound from starting before any user gesture,
+  // so we try to autoplay immediately and, if blocked, start on the very
+  // first tap/click/key anywhere on the page instead — still "automatic"
+  // from the visitor's point of view, just delayed to their first touch.
   const MUSIC_KEY = "metp_music_on";
   function initMusicToggle() {
     const btn = document.getElementById("btnMusic");
     const audio = document.getElementById("bgMusic");
     if (!btn || !audio) return;
     const icon = btn.querySelector("use");
+    audio.volume = 0.5;
 
     function setUI(on) {
       btn.setAttribute("aria-pressed", on ? "true" : "false");
       btn.setAttribute("aria-label", on ? "Turn off background music" : "Turn on background music");
       if (icon) icon.setAttribute("href", on ? "#i-sound-on" : "#i-sound-off");
+      btn.classList.toggle("is-playing", on);
+    }
+    audio.addEventListener("play", () => setUI(true));
+    audio.addEventListener("pause", () => setUI(false));
+
+    let wantsOn = true;
+    try {
+      const stored = localStorage.getItem(MUSIC_KEY);
+      if (stored !== null) wantsOn = stored === "1";
+    } catch (e) {}
+    setUI(false);
+
+    function tryPlay() {
+      audio.play().catch(() => {});
     }
 
-    let on = false;
-    try { on = localStorage.getItem(MUSIC_KEY) === "1"; } catch (e) {}
-    setUI(on);
-    if (on) {
-      // Resume playback on first visit only after a real user gesture
-      // (autoplay policies block unmuted audio otherwise), so just
-      // reflect the saved "on" state in the icon and start on first tap.
+    if (wantsOn) {
+      tryPlay();
+      const kick = () => { tryPlay(); cleanup(); };
+      const cleanup = () => {
+        document.removeEventListener("pointerdown", kick);
+        document.removeEventListener("keydown", kick);
+      };
+      document.addEventListener("pointerdown", kick, { once: true });
+      document.addEventListener("keydown", kick, { once: true });
     }
 
     btn.addEventListener("click", () => {
-      const nowOn = audio.paused;
-      if (nowOn) {
-        audio.volume = 0.5;
-        audio.play().catch(() => {});
+      if (audio.paused) {
+        tryPlay();
+        try { localStorage.setItem(MUSIC_KEY, "1"); } catch (e) {}
       } else {
         audio.pause();
+        try { localStorage.setItem(MUSIC_KEY, "0"); } catch (e) {}
       }
-      setUI(nowOn);
-      try { localStorage.setItem(MUSIC_KEY, nowOn ? "1" : "0"); } catch (e) {}
     });
   }
 
