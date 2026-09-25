@@ -100,9 +100,10 @@
     if (!btn || !audio) return;
     const icon = btn.querySelector("use");
     audio.volume = 0.5;
-    // Seamless playback: when a track ends, move on to the next one in the
-    // list instead of looping the same track forever.
-    audio.loop = false;
+    // Repeat: the visitor's chosen track loops infinitely until they pick
+    // a different one from the dropdown -- no auto-advancing/shuffling
+    // through the list on its own.
+    audio.loop = true;
 
     const TRACKS = await loadTracks();
 
@@ -123,11 +124,6 @@
     } catch (e) {}
     if (picker) picker.value = trackId;
 
-    function currentIndex() {
-      const i = TRACKS.findIndex((t) => t.id === trackId);
-      return i === -1 ? 0 : i;
-    }
-
     function setSrc(id, { keepPosition = false } = {}) {
       const track = TRACKS.find((t) => t.id === id) || TRACKS[0];
       trackId = track.id;
@@ -146,14 +142,6 @@
     }
     audio.addEventListener("play", () => setUI(true));
     audio.addEventListener("pause", () => setUI(false));
-
-    // Seamless queue: advance to the next track (wrapping around) instead
-    // of stopping when one finishes.
-    audio.addEventListener("ended", () => {
-      const next = TRACKS[(currentIndex() + 1) % TRACKS.length];
-      setSrc(next.id);
-      tryPlay();
-    });
 
     let wantsOn = true;
     try {
