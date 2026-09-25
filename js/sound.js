@@ -57,19 +57,50 @@
     } catch (e) { /* audio is a nice-to-have, never let it break the UI */ }
   }
 
-  // Background music toggle (separate from the synthesized effects above).
-  // On by default; the visitor's choice is remembered in localStorage.
-  // Browsers block audio-with-sound from starting before any user gesture,
-  // so we try to autoplay immediately and, if blocked, start on the very
-  // first tap/click/key anywhere on the page instead — still "automatic"
-  // from the visitor's point of view, just delayed to their first touch.
+  // Background music toggle + track picker (separate from the synthesized
+  // effects above). On by default; the visitor's choice of on/off AND which
+  // track is remembered in localStorage. Browsers block audio-with-sound
+  // from starting before any user gesture, so we try to autoplay
+  // immediately and, if blocked, start on the very first tap/click/key
+  // anywhere on the page instead — still "automatic" from the visitor's
+  // point of view, just delayed to their first touch.
   const MUSIC_KEY = "metp_music_on";
+  const TRACK_KEY = "metp_music_track";
+  const TRACKS = [
+    { id: "ambient", label: "Ambient room tone", src: "assets/audio/ambient-room-tone.m4a" },
+    { id: "astaga", label: "Astaga Bercanda — Akbar Chalay & Mingse", src: "assets/audio/astaga-bercanda.mp3" }
+  ];
+
   function initMusicToggle() {
     const btn = document.getElementById("btnMusic");
     const audio = document.getElementById("bgMusic");
+    const picker = document.getElementById("musicTrack");
     if (!btn || !audio) return;
     const icon = btn.querySelector("use");
     audio.volume = 0.5;
+
+    if (picker) {
+      picker.innerHTML = "";
+      TRACKS.forEach((t) => {
+        const opt = document.createElement("option");
+        opt.value = t.id;
+        opt.textContent = t.label;
+        picker.appendChild(opt);
+      });
+    }
+
+    let trackId = TRACKS[0].id;
+    try {
+      const storedTrack = localStorage.getItem(TRACK_KEY);
+      if (storedTrack && TRACKS.some((t) => t.id === storedTrack)) trackId = storedTrack;
+    } catch (e) {}
+    if (picker) picker.value = trackId;
+
+    function setSrc(id) {
+      const track = TRACKS.find((t) => t.id === id) || TRACKS[0];
+      audio.src = track.src;
+    }
+    setSrc(trackId);
 
     function setUI(on) {
       btn.setAttribute("aria-pressed", on ? "true" : "false");
@@ -111,6 +142,15 @@
         try { localStorage.setItem(MUSIC_KEY, "0"); } catch (e) {}
       }
     });
+
+    if (picker) {
+      picker.addEventListener("change", () => {
+        const wasPlaying = !audio.paused;
+        setSrc(picker.value);
+        try { localStorage.setItem(TRACK_KEY, picker.value); } catch (e) {}
+        if (wasPlaying) tryPlay();
+      });
+    }
   }
 
   // Coffee mug: tap it for a little glass "cling" + a ripple across the

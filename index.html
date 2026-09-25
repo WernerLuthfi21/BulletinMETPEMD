@@ -225,6 +225,7 @@
             <button class="key" id="btnRead" type="button" aria-label="Open this page in the reader (zoom)"><svg><use href="#i-zoom"/></svg><span class="txt">Read</span></button>
             <a class="key" id="btnOriginal" href="#" target="_blank" rel="noopener" hidden aria-label="Open original file"><svg><use href="#i-file"/></svg><span class="txt">Original</span></a>
             <button class="key sq" id="btnMusic" type="button" aria-pressed="false" aria-label="Turn on background music"><svg><use href="#i-sound-off"/></svg></button>
+            <select class="key track-pick" id="musicTrack" aria-label="Choose background music track"></select>
           </div>
         </div>
 
@@ -368,7 +369,7 @@
 
 <noscript><div class="noscript">This bulletin is an interactive binder and needs JavaScript. The original file is available in <code>assets/issues/</code>.</div></noscript>
 
-<audio id="bgMusic" src="assets/audio/ambient-room-tone.m4a" loop preload="none"></audio>
+<audio id="bgMusic" loop preload="none"></audio>
 <script src="config.js"></script>
 <script src="data/issues.js"></script>
 <script src="data/quotes.js"></script>
