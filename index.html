@@ -84,6 +84,8 @@
     <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><path d="M14 3v4h4M9 13h6M9 17h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
     <symbol id="i-text" viewBox="0 0 24 24"><path d="M5 6h14M5 11h14M5 16h9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
     <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-sound-on" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-sound-off" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path d="M16 9l5 6M21 9l-5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
   </defs>
 </svg>
 
@@ -216,6 +218,7 @@
           <div class="b-group">
             <button class="key" id="btnRead" type="button" aria-label="Open this page in the reader (zoom)"><svg><use href="#i-zoom"/></svg><span class="txt">Read</span></button>
             <a class="key" id="btnOriginal" href="#" target="_blank" rel="noopener" hidden aria-label="Open original file"><svg><use href="#i-file"/></svg><span class="txt">Original</span></a>
+            <button class="key sq" id="btnMusic" type="button" aria-pressed="false" aria-label="Turn on background music"><svg><use href="#i-sound-off"/></svg></button>
           </div>
         </div>
 
@@ -336,6 +339,7 @@
 
 <noscript><div class="noscript">This bulletin is an interactive binder and needs JavaScript. The original file is available in <code>assets/issues/</code>.</div></noscript>
 
+<audio id="bgMusic" src="assets/audio/ambient-room-tone.m4a" loop preload="none"></audio>
 <script src="config.js"></script>
 <script src="data/issues.js"></script>
 <script src="data/quotes.js"></script>

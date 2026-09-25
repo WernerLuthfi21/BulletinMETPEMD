@@ -57,6 +57,49 @@
     } catch (e) { /* audio is a nice-to-have, never let it break the UI */ }
   }
 
+  // Background music toggle (separate from the synthesized effects above).
+  // Off by default; the visitor's choice is remembered in localStorage.
+  const MUSIC_KEY = "metp_music_on";
+  function initMusicToggle() {
+    const btn = document.getElementById("btnMusic");
+    const audio = document.getElementById("bgMusic");
+    if (!btn || !audio) return;
+    const icon = btn.querySelector("use");
+
+    function setUI(on) {
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
+      btn.setAttribute("aria-label", on ? "Turn off background music" : "Turn on background music");
+      if (icon) icon.setAttribute("href", on ? "#i-sound-on" : "#i-sound-off");
+    }
+
+    let on = false;
+    try { on = localStorage.getItem(MUSIC_KEY) === "1"; } catch (e) {}
+    setUI(on);
+    if (on) {
+      // Resume playback on first visit only after a real user gesture
+      // (autoplay policies block unmuted audio otherwise), so just
+      // reflect the saved "on" state in the icon and start on first tap.
+    }
+
+    btn.addEventListener("click", () => {
+      const nowOn = audio.paused;
+      if (nowOn) {
+        audio.volume = 0.5;
+        audio.play().catch(() => {});
+      } else {
+        audio.pause();
+      }
+      setUI(nowOn);
+      try { localStorage.setItem(MUSIC_KEY, nowOn ? "1" : "0"); } catch (e) {}
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initMusicToggle);
+  } else {
+    initMusicToggle();
+  }
+
   M.sound = {
     open() {
       safe((c) => {
