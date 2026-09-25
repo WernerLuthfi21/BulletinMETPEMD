@@ -691,11 +691,18 @@ dialog::backdrop{background:rgba(18,8,3,.78);backdrop-filter:blur(2px)}
 .lid-stamp svg{width:100%;height:100%;display:block;overflow:visible}
 .lid-stamp text{fill:currentColor;font-weight:400}
 /* torn contact-sheet photo of the plant, pinned like the rest of the desk clippings */
-.lid-photo{position:absolute;left:54%;bottom:34%;z-index:2;width:26%;filter:var(--sh-2);transform-origin:20% 0%;animation:metp-photo-sway 8.4s var(--ease) infinite;animation-delay:2.3s}
+.lid-photo{position:absolute;left:46%;bottom:20%;z-index:2;width:44%;filter:var(--sh-2);transform-origin:20% 0%;animation:metp-photo-sway 8.4s var(--ease) infinite;animation-delay:2.3s}
 @keyframes metp-photo-sway{0%,100%{transform:rotate(4deg)}50%{transform:rotate(2.6deg)}}
-.lid-photo svg:first-child{width:100%;height:auto;display:block;
+/* the clip-path lives on the BUTTON itself (not just the svg), so the
+   clickable hit-area follows the die-cut tag outline instead of the
+   full rectangular bounding box — tapping the plain cover next to the
+   tag still opens the binder as normal; tapping the tag itself doesn't. */
+.lid-photo-hit{
+  display:block;width:100%;padding:0;margin:0;border:0;background:transparent;cursor:pointer;
   clip-path:polygon(3% 6%,80% 0,100% 12%,97% 92%,22% 100%,0 88%);
-  box-shadow:0 0 0 5px #f3ede0,0 0 0 6px rgba(0,0,0,.12)}
+}
+.lid-photo-hit svg{width:100%;height:auto;display:block;box-shadow:0 0 0 5px #f3ede0,0 0 0 6px rgba(0,0,0,.12)}
+.lid-photo-hit.is-bouncing svg{animation:metp-sticker-pop .5s var(--ease)}
 .lid-photo .clip{position:absolute;left:-10%;top:-22%;width:34%;color:var(--steel-3);filter:var(--sh-1)}
 .lid-mini{position:absolute;left:9%;bottom:7%;z-index:2;color:#e8d6cf;font:600 8px/1.15 var(--cond);letter-spacing:.08em;transform:rotate(-2deg);opacity:.88}
 /* "Engineering · Planning · Innovation" reads as its own torn kraft tag with a globe mark */
@@ -709,5 +716,5 @@ dialog::backdrop{background:rgba(18,8,3,.78);backdrop-filter:blur(2px)}
 .lid-label{left:11%;right:11%;bottom:29%;padding:0;background:transparent;border:0;box-shadow:none;transform:rotate(-1deg);display:none}
 @media (max-width:900px){
   .lid-gear{width:14%}.lid-open-note{font-size:10px;padding:8px 10px}.lid-sticker{top:24%;width:90%}.lid-note{font-size:13px}.lid-label{display:none}
-  .lid-stamp{width:22%;right:9%}.lid-photo{width:30%;left:52%}
+  .lid-stamp{width:22%;right:9%}.lid-photo{width:50%;left:44%;bottom:20%}
 }

@@ -220,12 +220,30 @@
     });
   }
 
+  // Cover chart tag (paperclipped bar-chart tag): tap it for a little pop +
+  // a soft "chirp" sound. It sits on top of the closed cover, which is
+  // itself one big "open the binder" click target — so this must stop the
+  // click from bubbling up, or tapping the tag would open the binder too.
+  function initChartTag() {
+    const btn = document.getElementById("lidChartTag");
+    if (!btn) return;
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      M.sound.tagPop();
+      btn.classList.remove("is-bouncing");
+      void btn.getBoundingClientRect(); // force reflow so the animation can restart
+      btn.classList.add("is-bouncing");
+    });
+    btn.addEventListener("animationend", () => btn.classList.remove("is-bouncing"));
+  }
+
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => { initMusicToggle(); initCoffeeCup(); initRealStickers(); });
+    document.addEventListener("DOMContentLoaded", () => { initMusicToggle(); initCoffeeCup(); initRealStickers(); initChartTag(); });
   } else {
     initMusicToggle();
     initCoffeeCup();
     initRealStickers();
+    initChartTag();
   }
 
   M.sound = {
@@ -254,6 +272,14 @@
         const t0 = c.currentTime;
         chime(c, t0, 1760, 0.35, 0.05);        // bright glass "cling" (A6)
         chime(c, t0 + 0.02, 2637, 0.28, 0.028); // shimmer overtone (E7)
+      });
+    },
+    tagPop() {
+      safe((c) => {
+        const t0 = c.currentTime;
+        noiseBurst(c, t0, 0.08, 0.1, 2600);     // tiny paper "tak"
+        chime(c, t0 + 0.01, 900, 0.16, 0.045);  // quick upward chirp — the "jump"
+        chime(c, t0 + 0.05, 1500, 0.13, 0.032);
       });
     }
   };
