@@ -64,20 +64,47 @@
   // immediately and, if blocked, start on the very first tap/click/key
   // anywhere on the page instead — still "automatic" from the visitor's
   // point of view, just delayed to their first touch.
+  //
+  // The track list itself is NOT hardcoded here: it's read from
+  // assets/audio/tracks.json, which tools/generate_audio_manifest.py (run
+  // by the "Update audio manifest" GitHub Action on every push that touches
+  // assets/audio/) rebuilds from whatever files are actually in that
+  // folder. Drop a new track in assets/audio/, push, and it appears in the
+  // picker with no code changes. The FALLBACK list below only covers the
+  // two tracks that shipped before the manifest existed, in case the fetch
+  // fails (e.g. opened straight from disk without a server).
   const MUSIC_KEY = "metp_music_on";
   const TRACK_KEY = "metp_music_track";
-  const TRACKS = [
-    { id: "ambient", label: "Ambient room tone", src: "assets/audio/ambient-room-tone.m4a" },
-    { id: "astaga", label: "Astaga Bercanda — Akbar Chalay & Mingse", src: "assets/audio/astaga-bercanda.mp3" }
+  const MANIFEST_URL = "assets/audio/tracks.json";
+  const FALLBACK_TRACKS = [
+    { id: "ambient-room-tone", label: "Ambient Room Tone", src: "assets/audio/ambient-room-tone.m4a" },
+    { id: "astaga-bercanda", label: "Astaga Bercanda", src: "assets/audio/astaga-bercanda.mp3" }
   ];
 
-  function initMusicToggle() {
+  async function loadTracks() {
+    try {
+      const res = await fetch(MANIFEST_URL, { cache: "no-store" });
+      if (!res.ok) throw new Error("manifest fetch failed");
+      const list = await res.json();
+      if (Array.isArray(list) && list.length) return list;
+      throw new Error("empty manifest");
+    } catch (e) {
+      return FALLBACK_TRACKS;
+    }
+  }
+
+  async function initMusicToggle() {
     const btn = document.getElementById("btnMusic");
     const audio = document.getElementById("bgMusic");
     const picker = document.getElementById("musicTrack");
     if (!btn || !audio) return;
     const icon = btn.querySelector("use");
     audio.volume = 0.5;
+    // Seamless playback: when a track ends, move on to the next one in the
+    // list instead of looping the same track forever.
+    audio.loop = false;
+
+    const TRACKS = await loadTracks();
 
     if (picker) {
       picker.innerHTML = "";
@@ -96,9 +123,18 @@
     } catch (e) {}
     if (picker) picker.value = trackId;
 
-    function setSrc(id) {
+    function currentIndex() {
+      const i = TRACKS.findIndex((t) => t.id === trackId);
+      return i === -1 ? 0 : i;
+    }
+
+    function setSrc(id, { keepPosition = false } = {}) {
       const track = TRACKS.find((t) => t.id === id) || TRACKS[0];
+      trackId = track.id;
+      if (!keepPosition) audio.currentTime = 0;
       audio.src = track.src;
+      if (picker) picker.value = trackId;
+      try { localStorage.setItem(TRACK_KEY, trackId); } catch (e) {}
     }
     setSrc(trackId);
 
@@ -110,6 +146,14 @@
     }
     audio.addEventListener("play", () => setUI(true));
     audio.addEventListener("pause", () => setUI(false));
+
+    // Seamless queue: advance to the next track (wrapping around) instead
+    // of stopping when one finishes.
+    audio.addEventListener("ended", () => {
+      const next = TRACKS[(currentIndex() + 1) % TRACKS.length];
+      setSrc(next.id);
+      tryPlay();
+    });
 
     let wantsOn = true;
     try {
@@ -147,7 +191,6 @@
       picker.addEventListener("change", () => {
         const wasPlaying = !audio.paused;
         setSrc(picker.value);
-        try { localStorage.setItem(TRACK_KEY, picker.value); } catch (e) {}
         if (wasPlaying) tryPlay();
       });
     }
