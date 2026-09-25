@@ -1,0 +1,39 @@
+name: Update audio manifest
+
+# Regenerates assets/audio/tracks.json whenever an audio file is added,
+# renamed or removed from assets/audio/. Push a new .mp3/.m4a/.ogg/.wav
+# into that folder (via git, or by uploading through the GitHub web UI)
+# and this fills in the music picker on the site automatically.
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "assets/audio/**"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  update-manifest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Regenerate assets/audio/tracks.json
+        run: python3 tools/generate_audio_manifest.py
+
+      - name: Commit if changed
+        run: |
+          git config user.name "metp-bot"
+          git config user.email "actions@users.noreply.github.com"
+          if git diff --quiet -- assets/audio/tracks.json; then
+            echo "No change to tracks.json"
+          else
+            git add assets/audio/tracks.json
+            git commit -m "chore: update audio manifest [skip ci]"
+            git push
+          fi
