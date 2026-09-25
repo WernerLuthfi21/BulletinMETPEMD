@@ -392,18 +392,18 @@ button.key svg,a.key svg{width:17px;height:17px;flex:none}
    white sticker border, so they read as physically stuck on top of the
    printed cover rather than part of the print itself. */
 .lid-realsticker{
-  position:absolute;z-index:4;display:block;width:15%;height:auto;
+  position:absolute;z-index:4;display:block;width:8%;height:auto;
   filter:drop-shadow(0 3px 5px rgba(0,0,0,.45));
   pointer-events:none;
 }
-.lid-realsticker.rs-1{left:38%;top:5%;width:15%;transform:rotate(-6deg)}
-.lid-realsticker.rs-2{left:6%;bottom:5%;width:15%;transform:rotate(7deg)}
-.lid-realsticker.rs-3{right:6%;bottom:22%;width:15%;transform:rotate(-5deg)}
+.lid-realsticker.rs-1{left:4%;top:15%;width:8%;transform:rotate(-8deg)}
+.lid-realsticker.rs-2{right:4%;top:15%;width:8%;transform:rotate(8deg)}
+.lid-realsticker.rs-3{right:5%;bottom:3%;width:8%;transform:rotate(-6deg)}
 @media (max-width:900px){
-  .lid-realsticker{width:20%}
-  .lid-realsticker.rs-1{left:34%;top:4%}
-  .lid-realsticker.rs-2{left:4%;bottom:4%}
-  .lid-realsticker.rs-3{right:4%;bottom:19%}
+  .lid-realsticker{width:11%}
+  .lid-realsticker.rs-1{left:3%;top:13%}
+  .lid-realsticker.rs-2{right:3%;top:13%}
+  .lid-realsticker.rs-3{right:4%;bottom:3%}
 }
 .lid-label{
   position:absolute;left:12%;right:12%;bottom:14%;padding:14px 12px 12px;text-align:center;
