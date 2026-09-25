@@ -113,10 +113,34 @@
     });
   }
 
+  // Coffee mug: tap it for a little glass "cling" + a ripple across the
+  // surface (in addition to the always-running idle ripple in the CSS).
+  function initCoffeeCup() {
+    const btn = document.getElementById("coffeeCup");
+    if (!btn) return;
+    const ripple = btn.querySelector(".ripple-click");
+
+    function fireRipple() {
+      if (!ripple) return;
+      ripple.classList.remove("is-active");
+      void ripple.getBoundingClientRect(); // force reflow so the animation can restart
+      ripple.classList.add("is-active");
+    }
+
+    btn.addEventListener("click", () => {
+      M.sound.coffeeClink();
+      fireRipple();
+    });
+    if (ripple) {
+      ripple.addEventListener("animationend", () => ripple.classList.remove("is-active"));
+    }
+  }
+
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initMusicToggle);
+    document.addEventListener("DOMContentLoaded", () => { initMusicToggle(); initCoffeeCup(); });
   } else {
     initMusicToggle();
+    initCoffeeCup();
   }
 
   M.sound = {
@@ -138,6 +162,13 @@
     flip() {
       safe((c) => {
         noiseBurst(c, c.currentTime, 0.2, 0.09, 2200);
+      });
+    },
+    coffeeClink() {
+      safe((c) => {
+        const t0 = c.currentTime;
+        chime(c, t0, 1760, 0.35, 0.05);        // bright glass "cling" (A6)
+        chime(c, t0 + 0.02, 2637, 0.28, 0.028); // shimmer overtone (E7)
       });
     }
   };

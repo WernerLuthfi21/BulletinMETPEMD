@@ -398,10 +398,10 @@ button.key svg,a.key svg{width:17px;height:17px;flex:none}
 .pencil{left:6px;bottom:1%;width:186px;transform:rotate(-31deg);z-index:4}
 .pen{left:26px;bottom:-1%;width:168px;transform:rotate(-22deg);z-index:3}
 
-/* coffee mug — desk accessory beside the binder, not on the cover */
-.coffee{width:104px}
-.coffee .coffee-liquid{transform-origin:50% 50%;animation:metp-coffee-shimmer 3.6s ease-in-out infinite}
-@keyframes metp-coffee-shimmer{0%,100%{transform:scaleX(1) scaleY(1)}50%{transform:scaleX(1.035) scaleY(.92)}}
+/* coffee mug — desk accessory beside the binder, seen from above, tappable */
+.coffee{width:104px;display:block;border:0;background:transparent;padding:0;cursor:pointer}
+.coffee svg{width:100%;height:auto;display:block;overflow:visible}
+.coffee:active{filter:brightness(.97)}
 .coffee .steam{opacity:0;transform-origin:50% 100%;animation:metp-steam-rise 4s ease-out infinite}
 .coffee .s1{animation-duration:3.6s;animation-delay:.2s}
 .coffee .s2{animation-duration:4.2s;animation-delay:1.3s}
@@ -412,6 +412,21 @@ button.key svg,a.key svg{width:17px;height:17px;flex:none}
   55%{opacity:.45;transform:translateY(-11px) translateX(2.5px) scaleY(1.05)}
   85%{opacity:.15}
   100%{opacity:0;transform:translateY(-24px) translateX(-2px) scaleY(1.2)}
+}
+/* idle ripple: two rings continuously widening across the coffee surface */
+.coffee .ripple-idle{r:6px;stroke-opacity:.4;animation:metp-ripple-idle 3.2s ease-out infinite}
+.coffee .ripple-idle.r2{animation-delay:1.6s}
+@keyframes metp-ripple-idle{
+  0%{r:6px;stroke-opacity:.4}
+  75%{stroke-opacity:.1}
+  100%{r:44px;stroke-opacity:0}
+}
+/* click ripple: a bigger, faster ring fired on tap, then it resets and waits */
+.coffee .ripple-click{r:4px;stroke-opacity:0}
+.coffee .ripple-click.is-active{animation:metp-ripple-click .65s ease-out}
+@keyframes metp-ripple-click{
+  0%{r:4px;stroke-opacity:.75}
+  100%{r:50px;stroke-opacity:0}
 }
 .clip{width:30px}
 .clip.c1{right:-6px;top:36%;transform:rotate(14deg);z-index:5}
