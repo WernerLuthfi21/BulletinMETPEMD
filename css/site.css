@@ -126,7 +126,30 @@ img{max-width:100%}
 .binder[data-state="closed"]:not([data-motion]) .rings,
 .binder[data-state="closed"]:not([data-motion]) .b-bar,
 .binder[data-state="closed"]:not([data-motion]) .sticker,
-.binder[data-state="closed"]:not([data-motion]) .hint{opacity:0;visibility:hidden}
+.binder[data-state="closed"]:not([data-motion]) .binder-close-hit{
+  position:absolute;z-index:13;right:18px;top:18px;
+  display:flex;align-items:center;gap:8px;
+  min-height:34px;padding:7px 11px 7px 13px;
+  border:1px solid rgba(72,40,25,.18);border-radius:3px;
+  background:linear-gradient(155deg,#f8f0dc,#e6d8ba);
+  color:#3d3027;box-shadow:2px 3px 5px rgba(0,0,0,.25);
+  font:700 11px/1 var(--ui,Arial,sans-serif);letter-spacing:.06em;
+  cursor:pointer;transform:rotate(1.5deg) translateY(-2px);
+  opacity:0;visibility:hidden;pointer-events:none;
+  transition:opacity .35s var(--ease),transform .25s var(--ease),visibility .35s;
+}
+.binder-close-hit b{font-size:18px;line-height:12px;font-weight:500}
+.binder-close-hit:hover{transform:rotate(.5deg) translateY(-3px) scale(1.03)}
+.binder[data-state="open"] .binder-close-hit{
+  opacity:.94;visibility:visible;pointer-events:auto;
+}
+.binder[data-state="closed"] .binder-close-hit{display:none}
+.binder[data-motion="closing"] .binder-close-hit{opacity:0;pointer-events:none}
+@media (max-width:900px){
+  .binder-close-hit{right:12px;top:12px;font-size:10px;padding:6px 9px}
+}
+
+.hint{opacity:0;visibility:hidden}
 .binder[data-state="closed"]:not([data-motion]) .spread{
   opacity:1;visibility:visible;clip-path:inset(0 0 0 50%);
 }
