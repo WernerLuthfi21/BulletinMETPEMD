@@ -34,7 +34,8 @@
     try{
       const oldL=document.getElementById("slotL");
       const oldR=document.getElementById("slotR");
-      const source=(dir>0?oldR:oldL).firstElementChild;
+      const single=!!B.single;
+      const source=(single?oldR:(dir>0?oldR:oldL)).firstElementChild;
       if(!source){ B.cur=target; B.rerender(); return; }
 
       const moving=source.cloneNode(true);
@@ -44,17 +45,25 @@
 
       const targetL=document.getElementById("slotL");
       const targetR=document.getElementById("slotR");
-      const under=(dir>0?targetR:targetL);
-      const backSource=(dir>0?targetL:targetR).firstElementChild;
+      const backSource=(single?targetR:(dir>0?targetL:targetR)).firstElementChild;
       const back=backSource ? backSource.cloneNode(true) : document.createElement("div");
-      if(dir>0) targetL.style.visibility="hidden"; else targetR.style.visibility="hidden";
+      if(single){
+        targetR.style.visibility="hidden";
+      }else if(dir>0){
+        targetL.style.visibility="hidden";
+      }else{
+        targetR.style.visibility="hidden";
+      }
 
       const sheet=document.createElement("div");
       sheet.className="metp-physical-sheet";
+      const sheetWidth=single?"100%":"50%";
+      const sheetLeft=single?"0":(dir>0?"50%":"0");
+      const origin=single?"left":(dir>0?"right":"left");
       sheet.style.cssText=[
-        "position:absolute","top:0","height:100%","width:50%","z-index:20",
+        "position:absolute","top:0","height:100%","width:"+sheetWidth,"z-index:20",
         "transform-style:preserve-3d","pointer-events:none","will-change:transform",
-        "left:"+(dir>0?"50%":"0"),"transform-origin:"+(dir>0?"right":"left")+" center"
+        "left:"+sheetLeft,"transform-origin:"+origin+" center"
       ].join(";");
       const front=document.createElement("div");
       front.className="face";
