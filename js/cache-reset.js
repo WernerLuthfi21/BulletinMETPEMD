@@ -12,21 +12,37 @@
   var previous = null;
   try { previous = localStorage.getItem(key); } catch (e) {}
 
-  if (previous === build) return;
+  function hardReload(version) {
+    try { localStorage.setItem(key, version); } catch (e) {}
+    var purge = (window.caches && caches.keys)
+      ? caches.keys().then(function (keys) {
+          return Promise.all(keys.map(function (name) {
+            return caches.delete(name);
+          }));
+        })
+      : Promise.resolve();
 
-  try { localStorage.setItem(key, build); } catch (e) {}
+    purge.catch(function () {}).then(function () {
+      // A query on the document URL also bypasses a stale GitHub Pages/CDN
+      // document, while every CSS/JS asset already carries the same build id.
+      var url = window.location.pathname +
+        "?metp=" + encodeURIComponent(version) +
+        window.location.hash;
+      window.location.replace(url);
+    });
+  }
 
-  var purge = (window.caches && caches.keys)
-    ? caches.keys().then(function (keys) {
-        return Promise.all(keys.map(function (name) {
-          return caches.delete(name);
-        }));
+  if (previous === build) {
+    // Also verify against a tiny no-store endpoint. This catches the case
+    // where an old index.html itself was served from a CDN cache.
+    fetch("version.json?cb=" + Date.now(), { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (v) {
+        if (v && v.build && v.build !== build) hardReload(v.build);
       })
-    : Promise.resolve();
+      .catch(function () {});
+    return;
+  }
 
-  purge.catch(function () {}).then(function () {
-    // Cache-busting query strings on the assets handle the normal HTTP cache;
-    // this reload only runs once per build token.
-    window.location.reload();
-  });
+  hardReload(build);
 })();
