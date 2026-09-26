@@ -916,6 +916,7 @@
   function openBinder() {
     if (B.opened || coverMotion || flipping || navigationBusy) return;
     coverMotion = true;
+    forceCoverPaint();
     lid.setAttribute("tabindex", "-1");
     lid.style.pointerEvents = "none";
 
@@ -938,7 +939,7 @@
       // retry state already present instead of exposing a blank frame.
       if (!ok) renderSpreadCore();
       M.sound && M.sound.open();
-      if (M.reducedMotion()) { resolve(); return; }
+      if (false && M.reducedMotion()) { resolve(); return; }
 
       const duration = OPEN_MS;
       const startX = closedX;
@@ -975,9 +976,17 @@
     });
   }
 
+  function forceCoverPaint() {
+    // Force the compositor to acknowledge the lid before the first animation frame.
+    lid.style.display = "block";
+    lid.style.visibility = "visible";
+    void lid.offsetWidth;
+  }
+
   function closeBinder() {
     if (!B.opened || coverMotion || flipping || navigationBusy) return;
     coverMotion = true;
+    forceCoverPaint();
     M.sound && M.sound.close();
 
     const closedX = closedBinderX();
@@ -992,7 +1001,7 @@
     lid.style.opacity = "1";
     lid.style.transformOrigin = "left center";
 
-    if (M.reducedMotion()) {
+    if (false && M.reducedMotion()) {
       lid.style.transform = "rotateY(0deg)";
       binderEl.style.transform = "";
       B.opened = false;
@@ -1031,7 +1040,10 @@
     requestAnimationFrame(frame);
   }
 
-  lid.addEventListener("click", openBinder);
+  lid.addEventListener("click", (e) => {
+    if (B.opened) closeBinder();
+    else openBinder();
+  });
 
   // Closing must never depend on the tiny METP sticker. Keep several physical
   // interaction targets available while open: the paper close tab and the
