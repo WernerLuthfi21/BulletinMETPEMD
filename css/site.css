@@ -89,9 +89,11 @@ img{max-width:100%}
   position:relative;
   width:calc(var(--lw)*2 + var(--ms)*2);
   height:calc(var(--lh) + var(--mt) + var(--mb));
-  perspective:1900px;perspective-origin:50% 38%;
+  perspective:2600px;perspective-origin:50% 38%;
   transition:transform .9s var(--ease);
   transform:translateX(0) rotate(-.35deg);
+}
+.binder[data-motion]{transition:none!important;
 }
 /* closed: only the right half (front cover) is visible, centred */
 /* (+ half the tab gutter, so the lone cover sits centred between the desk props) */
@@ -380,7 +382,7 @@ img{max-width:100%}
   position:absolute;top:0;height:100%;z-index:20;pointer-events:none;
   transform-style:preserve-3d;-webkit-transform-style:preserve-3d;
   backface-visibility:visible;-webkit-backface-visibility:visible;
-  perspective:1800px;will-change:transform;
+  perspective:2400px;will-change:transform;
   transform-origin:center center;
 }
 .physical-turn-face{
@@ -548,6 +550,7 @@ button.key svg,a.key svg{width:17px;height:17px;flex:none}
   backface-visibility:visible;-webkit-backface-visibility:visible;
   transform:rotateY(0) translateZ(0);
   cursor:pointer;will-change:transform;
+  transition:none!important;
 }
 .binder[data-mode="single"] .lid{width:100%}
 .lid-face{
