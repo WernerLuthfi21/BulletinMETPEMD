@@ -320,7 +320,15 @@
     return wrap;
   }
 
-  function renderSpread() {
+  // The part of a re-render that MUST happen the instant a flip reaches its
+  // midpoint: swap what the two slots contain, so the still-rotating leaf's
+  // back face lines up with real content the moment it faces forward.
+  // Deliberately minimal — no tab rebuilding, no credits card, nothing that
+  // isn't required for that one visual guarantee — because this runs
+  // synchronously inside the same requestAnimationFrame tick as the flip's
+  // own transform update. Any extra work here delays that frame's paint
+  // and shows up as a stutter at the exact moment the turn is most visible.
+  function renderSpreadCore() {
     const [a, b] = B.spreads[B.cur] || [null, null];
     slotL.classList.toggle("empty", !a);
     slotR.classList.toggle("empty", !b && !B.single);
@@ -329,13 +337,20 @@
     if (a) slotL.appendChild(buildLeafContent(pageMeta(a), "left"));
     if (b) slotR.appendChild(buildLeafContent(pageMeta(b), "right"));
     else if (!B.single) slotR.appendChild(buildLeafContent(null, "right"));
-
-    renderMeta();
     document.getElementById("prevPage").disabled = B.cur === 0;
     document.getElementById("nextPage").disabled = B.cur === B.spreads.length - 1;
     const peelL = document.getElementById("peelLeft"), peelR = document.getElementById("peelRight");
     if (peelL) peelL.disabled = B.cur === 0;
     if (peelR) peelR.disabled = B.cur === B.spreads.length - 1;
+  }
+
+  // Full re-render: the core swap above, plus the header/credits card and
+  // the month-tab strip. Used whenever there is no in-flight flip animation
+  // to protect (init, resize, a background data refresh) — safe to do all
+  // of this in one go since nothing here needs to race a paint.
+  function renderSpread() {
+    renderSpreadCore();
+    renderMeta();
     renderTabs();
   }
 
@@ -410,8 +425,13 @@
           const first = (B.spreads[target] || []).find((p) => p && !p.placeholder);
           if (first) B.selectedIssueId = first.issue.id;
         }
-        renderSpread();
+        // Only the minimal slot swap happens on the animation's own clock —
+        // see renderSpreadCore's comment for why. The tab strip and header
+        // are refreshed right after, once the flip has actually landed.
+        renderSpreadCore();
       }, viaTab);
+      renderMeta();
+      renderTabs();
     } catch (err) {
       // Should be unreachable now (animateFlip never rejects), but guarantee
       // the interface is never left stuck if something unexpected throws.
