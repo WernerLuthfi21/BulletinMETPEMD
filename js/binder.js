@@ -956,14 +956,16 @@
   }
 
   function coverTransform(progress, opening) {
-    // Physical hard-cover motion: one rigid cover, one hinge, two registered
-    // faces. The critical rule is that the artwork front is NEVER shown from
-    // behind; once the sheet crosses 90deg the real inner/back face takes over.
     const p = M.clamp(progress, 0, 1);
     const e = .5 - .5 * Math.cos(Math.PI * p);
     const angle = opening ? -180 * e : -180 * (1 - e);
-    const lift = Math.sin(Math.PI * e) * 4;
+    const lift = Math.sin(Math.PI * e) * 3.5;
     return "translateZ(" + lift.toFixed(2) + "px) rotateY(" + angle.toFixed(3) + "deg)";
+  }
+
+  async function waitForCurrentSpread() {
+    currentSpreadReady = await ensureSpreadReady(B.spreads[B.cur]);
+    return currentSpreadReady;
   }
 
   function paintPaperMotion(progress) {
