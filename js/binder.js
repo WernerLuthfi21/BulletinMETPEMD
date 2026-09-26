@@ -460,24 +460,36 @@
   }
 
   function updateTurn(sheet, p, dir) {
-    // Quintic smoothstep: starts/ends softly, with no abrupt velocity change.
+    // Reference model: a real sheet rotates around its bound edge. Do not
+    // skew the entire card while it turns; the skew was the source of the
+    // "giant rigid card" look. The front/back faces stay registered in 3D.
     const e = p < .5
       ? 16 * Math.pow(p, 5)
       : 1 - Math.pow(-2 * p + 2, 5) / 2;
     const angle = (dir > 0 ? -180 : 180) * e;
+    const curl = Math.sin(Math.PI * e);
 
-    // Small Z lift + Y skew sells paper thickness without turning the page
-    // into a rigid rotating card.
-    const bow = Math.sin(Math.PI * e);
-    const skew = (dir > 0 ? -1 : 1) * bow * 0.9;
     sheet.host.style.transform =
-      "rotateY(" + angle.toFixed(3) + "deg) translateZ(" + (bow * 20).toFixed(2) + "px) skewY(" + skew.toFixed(3) + "deg)";
+      "rotateY(" + angle.toFixed(3) + "deg) translateZ(" + (curl * 4).toFixed(2) + "px)";
 
-    // Light moves across the sheet as it crosses edge-on.
-    sheet.frontShade.style.opacity = String(Math.min(.48, bow * .42 + (p > .52 ? .06 : 0)));
-    sheet.backShade.style.opacity = String(Math.min(.38, bow * .30));
-    sheet.front.style.filter = "brightness(" + (1 - bow * .10).toFixed(3) + ")";
-    sheet.back.style.filter = "brightness(" + (1 - bow * .06).toFixed(3) + ")";
+    // A moving edge shadow + a soft paper highlight gives the CSS 3D
+    // reference its page-depth cue without making the sheet look metallic.
+    sheet.frontShade.style.opacity = String(Math.min(.55, curl * .58));
+    sheet.backShade.style.opacity = String(Math.min(.42, curl * .46));
+    sheet.front.style.filter = "brightness(" + (1 - curl * .075).toFixed(3) + ")";
+    sheet.back.style.filter = "brightness(" + (1 - curl * .045).toFixed(3) + ")";
+  }
+
+  function updateTurnProgress(sheet, progress, dir) {
+    const p = M.clamp(progress, 0, 1);
+    const angle = (dir > 0 ? -180 : 180) * p;
+    const curl = Math.sin(Math.PI * p);
+    sheet.host.style.transform =
+      "rotateY(" + angle.toFixed(3) + "deg) translateZ(" + (curl * 4).toFixed(2) + "px)";
+    sheet.frontShade.style.opacity = String(Math.min(.58, curl * .62));
+    sheet.backShade.style.opacity = String(Math.min(.44, curl * .48));
+    sheet.front.style.filter = "brightness(" + (1 - curl * .075).toFixed(3) + ")";
+    sheet.back.style.filter = "brightness(" + (1 - curl * .045).toFixed(3) + ")";
   }
 
   function makeTurnUnderlay(node, left, width) {
@@ -643,29 +655,182 @@
     }
   }
 
-  /* ---------- drag / swipe / tap on the corner peel ----------
-     forward=true (bottom-right corner): dragging it toward the spine
-     (leftward) turns the page forward, like lifting a real page.
-     forward=false (bottom-left corner): dragging rightward turns back. */
-  function bindPeel(el, forward) {
+  /* ---------- real pull-to-turn interaction ----------
+     The reference implementation uses a sheet whose transform origin is its
+     bound edge. Here the same sheet is driven continuously by pointer
+     distance: drag a bottom corner, watch the page follow the finger, then
+     release to either complete the turn or spring back. */
+  async function bindPeel(el, forward) {
     if (!el) return;
-    let active = false, startX = 0, moved = false;
-    const THRESH = 40;
-    el.addEventListener("pointerdown", (e) => {
-      active = true; moved = false; startX = e.clientX;
-      try { el.setPointerCapture(e.pointerId); } catch (err) {}
+    let active = false;
+    let moved = false;
+    let pending = false;
+    let startX = 0;
+    let lastX = 0;
+    let pointerId = null;
+    let sheet = null;
+    let underlay = null;
+    let progress = 0;
+    let clickSuppressed = false;
+
+    function cleanup(cancelOnly) {
+      if (underlay) underlay.remove();
+      if (sheet) sheet.host.remove();
+      slotL.style.visibility = "";
+      slotR.style.visibility = "";
+      sheet = null;
+      underlay = null;
+      flipping = false;
+      navigationBusy = false;
+      active = false;
+      pending = false;
+      if (cancelOnly) updateTurnProgress = updateTurnProgress;
+    }
+
+    async function beginSheet() {
+      const target = B.cur + (forward ? 1 : -1);
+      if (!B.opened || target < 0 || target >= B.spreads.length || flipping || navigationBusy) return false;
+
+      navigationBusy = true;
+      await ensureSpreadReady(B.spreads[target]);
+      if (!active) { navigationBusy = false; return false; }
+
+      const destination = B.spreads[target] || [];
+      const rect = spreadEl.getBoundingClientRect();
+      const half = B.single ? rect.width : rect.width / 2;
+
+      if (B.single) {
+        const source = leafNode(slotR);
+        if (!source) { navigationBusy = false; return false; }
+        const dest = destination.find(Boolean) || null;
+        const back = dest ? buildLeafContent(pageMeta(dest), "right") : buildLeafContent(null, "right");
+        underlay = makeTurnUnderlay(
+          dest ? buildLeafContent(pageMeta(dest), "right") : buildLeafContent(null, "right"),
+          0, rect.width
+        );
+        sheet = makeTurnSheet(source, back, forward ? 1 : -1);
+        slotR.style.visibility = "hidden";
+      } else if (forward) {
+        const source = leafNode(slotR);
+        if (!source) { navigationBusy = false; return false; }
+        const back = destination[0]
+          ? buildLeafContent(pageMeta(destination[0]), "left")
+          : buildLeafContent(null, "left");
+        underlay = makeTurnUnderlay(
+          destination[1]
+            ? buildLeafContent(pageMeta(destination[1]), "right")
+            : buildLeafContent(null, "right"),
+          half, half
+        );
+        sheet = makeTurnSheet(source, back, 1);
+        slotR.style.visibility = "hidden";
+      } else {
+        const source = leafNode(slotL);
+        if (!source) { navigationBusy = false; return false; }
+        const back = destination[1]
+          ? buildLeafContent(pageMeta(destination[1]), "right")
+          : buildLeafContent(null, "right");
+        underlay = makeTurnUnderlay(
+          destination[0]
+            ? buildLeafContent(pageMeta(destination[0]), "left")
+            : buildLeafContent(null, "left"),
+          0, half
+        );
+        sheet = makeTurnSheet(source, back, -1);
+        slotL.style.visibility = "hidden";
+      }
+
+      flipping = true;
+      pending = false;
+      M.sound && M.sound.flip();
+      progress = 0;
+      updateTurnProgress(sheet, 0, forward ? 1 : -1);
+      return true;
+    }
+
+    function animateRelease(targetProgress, dir, commit) {
+      const from = progress;
+      const duration = Math.max(140, Math.round(260 + Math.abs(targetProgress - from) * 360));
+      let start = null;
+      function frame(ts) {
+        if (start == null) start = ts;
+        const q = M.clamp((ts - start) / duration, 0, 1);
+        const e = q < .5 ? 4*q*q*q : 1 - Math.pow(-2*q+2,3)/2;
+        progress = from + (targetProgress - from) * e;
+        updateTurnProgress(sheet, progress, dir);
+        if (q < 1) requestAnimationFrame(frame);
+        else {
+          if (commit) {
+            B.cur += forward ? 1 : -1;
+            const destination = B.spreads[B.cur] || [];
+            const first = destination.find((p) => p && !p.placeholder);
+            if (first) B.selectedIssueId = first.issue.id;
+            renderSpreadCore();
+          }
+          cleanup(!commit);
+          renderMeta();
+          renderTabs();
+        }
+      }
+      requestAnimationFrame(frame);
+    }
+
+    el.addEventListener("pointerdown", async (e) => {
+      if (e.button !== 0 && e.pointerType === "mouse") return;
+      if (!B.opened || flipping || navigationBusy) return;
+      active = true;
+      moved = false;
+      pending = true;
+      clickSuppressed = false;
+      startX = lastX = e.clientX;
+      pointerId = e.pointerId;
+      try { el.setPointerCapture(pointerId); } catch (err) {}
+
+      const ok = await beginSheet();
+      if (!ok || !active) {
+        active = false;
+        return;
+      }
+      progress = 0;
+      updateTurnProgress(sheet, 0, forward ? 1 : -1);
     });
+
     el.addEventListener("pointermove", (e) => {
-      if (!active) return;
-      const raw = e.clientX - startX;
-      if (Math.abs(raw) > 6) moved = true;
-      const triggered = forward ? raw < -THRESH : raw > THRESH;
-      if (triggered) { active = false; goToSpread(B.cur + (forward ? 1 : -1)); }
+      if (!active || e.pointerId !== pointerId || !sheet) return;
+      lastX = e.clientX;
+      const rect = spreadEl.getBoundingClientRect();
+      const width = B.single ? rect.width : rect.width / 2;
+      const raw = forward ? (startX - lastX) / width : (lastX - startX) / width;
+      progress = M.clamp(raw, 0, 1);
+      if (Math.abs(lastX - startX) > 6) { moved = true; clickSuppressed = true; }
+      updateTurnProgress(sheet, progress, forward ? 1 : -1);
     });
-    function release() { active = false; }
-    el.addEventListener("pointerup", release);
-    el.addEventListener("pointercancel", release);
-    el.addEventListener("click", () => { if (!moved) goToSpread(B.cur + (forward ? 1 : -1)); });
+
+    function end(e) {
+      if (!active || (e && e.pointerId !== pointerId)) return;
+      active = false;
+      if (!sheet) {
+        navigationBusy = false;
+        pending = false;
+        return;
+      }
+      const commit = progress > .35;
+      animateRelease(commit ? 1 : 0, forward ? 1 : -1, commit);
+      try { el.releasePointerCapture(pointerId); } catch (err) {}
+      pointerId = null;
+    }
+
+    el.addEventListener("pointerup", end);
+    el.addEventListener("pointercancel", (e) => {
+      if (!active) return;
+      active = false;
+      if (sheet) animateRelease(0, forward ? 1 : -1, false);
+      else { navigationBusy = false; pending = false; }
+    });
+    el.addEventListener("click", () => {
+      if (!clickSuppressed) goToSpread(B.cur + (forward ? 1 : -1));
+      clickSuppressed = false;
+    });
   }
 
   /* ---------- opening / closing animation ---------- */
