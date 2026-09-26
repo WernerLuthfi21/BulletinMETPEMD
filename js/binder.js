@@ -1243,9 +1243,13 @@
     let resizeT;
     function syncResponsiveMode() {
       const single = window.matchMedia("(max-width: 900px)").matches;
-      if (single === B.single) return;
       if (coverMotion || flipping || navigationBusy) {
         resizeT = setTimeout(syncResponsiveMode, 200);
+        return;
+      }
+      if (single === B.single) {
+        // Recompute the desktop cover offset when the leaf width changes within the same mode.
+        if (!single && !B.opened && binderEl.dataset.state === "closed") setBinderX(closedBinderX());
         return;
       }
       const curPage = (B.spreads[B.cur] || []).find(Boolean) || null;
