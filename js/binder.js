@@ -491,8 +491,17 @@
     const angle = (dir > 0 ? -180 : 180) * e;
     const curl = Math.sin(Math.PI * e);
 
+    // Slight lift + pitch only at mid-turn. The page remains a single
+    // physical sheet, but this gives the eye a changing depth cue instead of
+    // the "flat card" look. The lift returns exactly to zero at both ends.
+    const lift = curl * 9;
+    const pitch = (dir > 0 ? -1 : 1) * curl * 1.35;
+    const squeeze = 1 - curl * .018;
     sheet.host.style.transform =
-      "rotateY(" + angle.toFixed(3) + "deg) translateZ(" + (curl * 4).toFixed(2) + "px)";
+      "rotateY(" + angle.toFixed(3) + "deg) " +
+      "translateZ(" + lift.toFixed(2) + "px) " +
+      "rotateX(" + pitch.toFixed(3) + "deg) " +
+      "scaleX(" + squeeze.toFixed(4) + ")";
 
     // A moving edge shadow + a soft paper highlight gives the CSS 3D
     // reference its page-depth cue without making the sheet look metallic.
@@ -506,8 +515,14 @@
     const p = M.clamp(progress, 0, 1);
     const angle = (dir > 0 ? -180 : 180) * p;
     const curl = Math.sin(Math.PI * p);
+    const lift = curl * 9;
+    const pitch = (dir > 0 ? -1 : 1) * curl * 1.35;
+    const squeeze = 1 - curl * .018;
     sheet.host.style.transform =
-      "rotateY(" + angle.toFixed(3) + "deg) translateZ(" + (curl * 4).toFixed(2) + "px)";
+      "rotateY(" + angle.toFixed(3) + "deg) " +
+      "translateZ(" + lift.toFixed(2) + "px) " +
+      "rotateX(" + pitch.toFixed(3) + "deg) " +
+      "scaleX(" + squeeze.toFixed(4) + ")";
     sheet.frontShade.style.opacity = String(Math.min(.58, curl * .62));
     sheet.backShade.style.opacity = String(Math.min(.44, curl * .48));
     sheet.front.style.filter = "brightness(" + (1 - curl * .075).toFixed(3) + ")";
