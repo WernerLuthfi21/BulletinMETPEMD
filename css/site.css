@@ -89,7 +89,7 @@ img{max-width:100%}
   position:relative;
   width:calc(var(--lw)*2 + var(--ms)*2);
   height:calc(var(--lh) + var(--mt) + var(--mb));
-  perspective:2600px;perspective-origin:50% 35%;
+  perspective:1900px;perspective-origin:50% 38%;
   transition:transform .9s var(--ease);
   transform:translateX(0) rotate(-.35deg);
 }
@@ -154,7 +154,7 @@ img{max-width:100%}
 .spread{
   position:absolute;z-index:3;left:var(--ms);top:var(--mt);
   width:calc(var(--lw)*2);height:var(--lh);
-  perspective:2200px;perspective-origin:50% 40%;
+  perspective:1500px;perspective-origin:50% 42%;
   touch-action:pan-y;user-select:none;-webkit-user-select:none;
 }
 .binder[data-mode="single"] .spread{width:var(--lw);left:calc(var(--ms) + 16px)}
@@ -380,7 +380,7 @@ img{max-width:100%}
   position:absolute;top:0;height:100%;z-index:20;pointer-events:none;
   transform-style:preserve-3d;-webkit-transform-style:preserve-3d;
   backface-visibility:visible;-webkit-backface-visibility:visible;
-  perspective:2200px;will-change:transform;
+  perspective:1800px;will-change:transform;
   transform-origin:center center;
 }
 .physical-turn-face{
@@ -390,6 +390,23 @@ img{max-width:100%}
   transform-style:preserve-3d;-webkit-transform-style:preserve-3d;
   border:1px solid rgba(60,45,28,.10);
   box-shadow:0 5px 10px rgba(18,7,3,.14);
+}
+/* A narrow moving-looking paper edge. It is intentionally subtle: the
+   geometry still comes from the 3D hinge, while this highlight gives the
+   eye a rolled paper edge instead of a plastic card edge. */
+.physical-turn-face::after{
+  content:"";position:absolute;top:0;bottom:0;right:0;width:18px;
+  pointer-events:none;z-index:9;
+  background:
+    linear-gradient(90deg,transparent 0%,rgba(255,255,255,.05) 35%,
+    rgba(255,255,255,.55) 55%,rgba(72,50,32,.18) 78%,transparent 100%);
+  opacity:.48;
+}
+.physical-turn-face.back::after{
+  right:auto;left:0;
+  background:
+    linear-gradient(90deg,transparent 0%,rgba(72,50,32,.18) 22%,
+    rgba(255,255,255,.45) 48%,rgba(255,255,255,.05) 72%,transparent 100%);
 }
 .physical-turn-face.front{transform:rotateY(0deg) translateZ(.7px)}
 .physical-turn-face.back{transform:rotateY(180deg) translateZ(.7px)}
