@@ -895,26 +895,22 @@
   }
 
   function coverTransform(progress, opening) {
-    // Deliberately keep the front artwork facing the viewer. Instead of
-    // rotating a single card through 180deg (which exposes mirrored artwork
-    // on browsers with nested 3D compositing quirks), the cover performs a
-    // soft hinge-like pull: a small Y rotation, a gentle Z twist, depth lift,
-    // and a controlled slide off the pages. No backside is ever shown.
+    // Cover-only motion: keep the hinge fixed and rotate the actual hard cover.
+    // Do NOT translate the cover itself across the spread; the previous
+    // translateX was the reason it appeared as a floating rectangular card.
     const p = M.clamp(progress, 0, 1);
     const e = .5 - .5 * Math.cos(Math.PI * p);
     const s = Math.sin(Math.PI * e);
-    const w = Math.max(1, lid.getBoundingClientRect().width || 1);
-    const distance = w * 1.08;
-    const x = opening ? -distance * e : -distance * (1 - e);
-    const ry = -24 * s;
-    const rz = -5.5 * s;
-    const lift = 8 * s;
-    const squeeze = 1 - .025 * s;
-    return "translateX(" + x.toFixed(2) + "px) " +
-      "translateZ(" + lift.toFixed(2) + "px) " +
-      "rotateY(" + ry.toFixed(3) + "deg) " +
-      "rotateZ(" + rz.toFixed(3) + "deg) " +
-      "scaleX(" + squeeze.toFixed(4) + ")";
+
+    const angle = opening ? -179 * e : -179 * (1 - e);
+    const lift = 6 * s;
+    const pitch = (opening ? -1 : 1) * 0.75 * s;
+    const roll = (opening ? -1 : 1) * 0.9 * s;
+
+    return "translateZ(" + lift.toFixed(2) + "px) " +
+      "rotateY(" + angle.toFixed(3) + "deg) " +
+      "rotateX(" + pitch.toFixed(3) + "deg) " +
+      "rotateZ(" + roll.toFixed(3) + "deg)";
   }
 
   async function waitForCurrentSpread() {
@@ -922,22 +918,31 @@
     return currentSpreadReady;
   }
 
+  function paintPaperMotion(progress) {
+    const p = M.clamp(progress, 0, 1);
+    const s = Math.sin(Math.PI * (.5 - .5 * Math.cos(Math.PI * p)));
+    const edge = lid.querySelector(".lid-paper-edge");
+    if (edge) edge.style.opacity = String(Math.min(.82, .18 + s * .64));
+  }
+
   function openBinder() {
     if (B.opened || coverMotion || flipping || navigationBusy) return;
     coverMotion = true;
     forceCoverPaint();
-    lid.setAttribute("tabindex", "-1");
-    lid.style.pointerEvents = "none";
-    lid.style.visibility = "visible";
-    lid.style.opacity = "1";
 
     const closedX = closedBinderX();
-
     binderEl.setAttribute("data-state", "closed");
     binderEl.setAttribute("data-motion", "opening");
+
+    // Only the whole binder translates from its closed presentation to its
+    // open presentation. The cover itself rotates around its physical hinge.
     setBinderX(closedX);
+    lid.style.visibility = "visible";
+    lid.style.opacity = "1";
+    lid.style.pointerEvents = "none";
     lid.style.transformOrigin = "left center";
     lid.style.transform = coverTransform(0, true);
+    paintPaperMotion(0);
 
     const ready = currentSpreadReady ? Promise.resolve(true) : waitForCurrentSpread();
     ready.then((ok) => new Promise((resolve) => {
@@ -945,18 +950,19 @@
       M.sound && M.sound.open();
 
       const duration = OPEN_MS;
-      const startX = closedX;
       let start = null;
 
       function frame(ts) {
         if (start == null) start = ts;
         const p = M.clamp((ts - start) / duration, 0, 1);
         const e = .5 - .5 * Math.cos(Math.PI * p);
-        setBinderX(startX * (1 - e));
+
+        setBinderX(closedX * (1 - e));
         lid.style.transform = coverTransform(p, true);
+        paintPaperMotion(p);
 
         const shade = lid.querySelector(".front .shade");
-        if (shade) shade.style.opacity = String(Math.min(.48, Math.sin(Math.PI * p) * .58));
+        if (shade) shade.style.opacity = String(Math.min(.50, Math.sin(Math.PI * e) * .58));
 
         if (p < 1) requestAnimationFrame(frame);
         else resolve();
@@ -970,17 +976,19 @@
       lid.style.opacity = "0";
       lid.style.visibility = "hidden";
       lid.style.pointerEvents = "none";
-      lid.style.transform = "translateX(-110%)";
+      lid.style.transform = "rotateY(-179deg)";
+      paintPaperMotion(0);
       coverMotion = false;
     }).catch((e) => {
       console.error("[METP] binder open failed", e);
       binderEl.style.transform = "";
       binderEl.setAttribute("data-state", "closed");
       binderEl.removeAttribute("data-motion");
-      lid.style.transform = "translateX(0)";
+      lid.style.transform = "rotateY(0deg)";
       lid.style.opacity = "1";
       lid.style.visibility = "visible";
       lid.style.pointerEvents = "";
+      paintPaperMotion(0);
       coverMotion = false;
     });
   }
@@ -999,6 +1007,7 @@
 
     const closedX = closedBinderX();
 
+    // Start from the exact open position, then close the same hinge in reverse.
     binderEl.setAttribute("data-state", "open");
     binderEl.setAttribute("data-motion", "closing");
     setBinderX(0);
@@ -1007,6 +1016,8 @@
     lid.style.opacity = "1";
     lid.style.pointerEvents = "none";
     lid.style.transformOrigin = "left center";
+    lid.style.transform = coverTransform(0, false);
+    paintPaperMotion(0);
 
     const duration = OPEN_MS;
     let start = null;
@@ -1015,11 +1026,13 @@
       if (start == null) start = ts;
       const p = M.clamp((ts - start) / duration, 0, 1);
       const e = .5 - .5 * Math.cos(Math.PI * p);
+
       setBinderX(closedX * e);
       lid.style.transform = coverTransform(p, false);
+      paintPaperMotion(p);
 
       const shade = lid.querySelector(".front .shade");
-      if (shade) shade.style.opacity = String(Math.min(.48, Math.sin(Math.PI * p) * .58));
+      if (shade) shade.style.opacity = String(Math.min(.50, Math.sin(Math.PI * e) * .58));
 
       if (p < 1) requestAnimationFrame(frame);
       else {
@@ -1027,11 +1040,12 @@
         binderEl.setAttribute("data-state", "closed");
         binderEl.removeAttribute("data-motion");
         binderEl.style.transform = "";
-        lid.style.transform = "translateX(0)";
+        lid.style.transform = "rotateY(0deg)";
         lid.style.opacity = "1";
         lid.style.visibility = "visible";
         lid.style.pointerEvents = "";
         lid.setAttribute("tabindex", "0");
+        paintPaperMotion(0);
         coverMotion = false;
       }
     }
