@@ -480,15 +480,29 @@
     sheet.back.style.filter = "brightness(" + (1 - bow * .06).toFixed(3) + ")";
   }
 
+  function makeTurnUnderlay(node, left, width) {
+    const under = M.el("div", { class: "physical-turn-underlay" });
+    under.style.left = left + "px";
+    under.style.width = width + "px";
+    if (node) under.appendChild(node);
+    spreadEl.appendChild(under);
+    return under;
+  }
+
   function animatePhysicalTurn(dir, target, viaTab) {
-    const current = B.spreads[B.cur] || [];
     const destination = B.spreads[target] || [];
-    const spreadWidth = spreadEl.getBoundingClientRect().width;
+    const rect = spreadEl.getBoundingClientRect();
+    const half = B.single ? rect.width : rect.width / 2;
 
     if (B.single) {
       const source = leafNode(slotR);
       if (!source) return Promise.resolve();
-      const back = destination.find(Boolean) ? buildLeafContent(pageMeta(destination.find(Boolean)), "right") : null;
+      const destPage = destination.find(Boolean) || null;
+      const back = destPage ? buildLeafContent(pageMeta(destPage), "right") : buildLeafContent(null, "right");
+      const under = makeTurnUnderlay(
+        destPage ? buildLeafContent(pageMeta(destPage), "right") : buildLeafContent(null, "right"),
+        0, rect.width
+      );
       const sheet = makeTurnSheet(source, back, dir);
       slotR.style.visibility = "hidden";
       return runPhysicalTurn(sheet, dir, () => {
@@ -498,22 +512,30 @@
           if (first) B.selectedIssueId = first.issue.id;
         }
         renderSpreadCore();
-      });
+      }, under);
     }
 
     if (dir > 0) {
-      // Forward: current RIGHT page physically turns left.
-      // Destination LEFT page is its back; destination RIGHT is already
-      // rendered underneath and stays completely still.
+      // Forward: the current RIGHT page is the only physical sheet that
+      // moves. The destination RIGHT page is placed underneath it BEFORE
+      // the source is hidden, so the right side is never an empty red slab.
       const source = leafNode(slotR);
-      const destinationLeft = destination[0] || null;
-      const back = destinationLeft ? buildLeafContent(pageMeta(destinationLeft), "left") : null;
       if (!source) return Promise.resolve();
 
+      const destinationLeft = destination[0] || null;
+      const destinationRight = destination[1] || null;
+      const back = destinationLeft
+        ? buildLeafContent(pageMeta(destinationLeft), "left")
+        : buildLeafContent(null, "left");
+      const under = makeTurnUnderlay(
+        destinationRight
+          ? buildLeafContent(pageMeta(destinationRight), "right")
+          : buildLeafContent(null, "right"),
+        half, half
+      );
       const sheet = makeTurnSheet(source, back, dir);
       slotR.style.visibility = "hidden";
-      // Keep current LEFT visible until the moving sheet covers it. The target
-      // RIGHT page is inserted only after the turn, so there is no blank flash.
+
       return runPhysicalTurn(sheet, dir, () => {
         B.cur = target;
         if (!viaTab) {
@@ -521,17 +543,28 @@
           if (first) B.selectedIssueId = first.issue.id;
         }
         renderSpreadCore();
-      });
+      }, under);
     }
 
-    // Backward: current LEFT page physically turns right.
+    // Backward: mirror image. The destination LEFT page is already underneath
+    // the sheet before the current LEFT page is hidden.
     const source = leafNode(slotL);
-    const destinationRight = destination[1] || destination[0] || null;
-    const back = destinationRight ? buildLeafContent(pageMeta(destinationRight), "right") : null;
     if (!source) return Promise.resolve();
 
+    const destinationLeft = destination[0] || null;
+    const destinationRight = destination[1] || null;
+    const back = destinationRight
+      ? buildLeafContent(pageMeta(destinationRight), "right")
+      : buildLeafContent(null, "right");
+    const under = makeTurnUnderlay(
+      destinationLeft
+        ? buildLeafContent(pageMeta(destinationLeft), "left")
+        : buildLeafContent(null, "left"),
+      0, half
+    );
     const sheet = makeTurnSheet(source, back, dir);
     slotL.style.visibility = "hidden";
+
     return runPhysicalTurn(sheet, dir, () => {
       B.cur = target;
       if (!viaTab) {
@@ -539,10 +572,10 @@
         if (first) B.selectedIssueId = first.issue.id;
       }
       renderSpreadCore();
-    });
+    }, under);
   }
 
-  function runPhysicalTurn(sheet, dir, onLand) {
+  function runPhysicalTurn(sheet, dir, onLand, underlay) {
     if (M.reducedMotion()) {
       onLand();
       sheet.host.remove();
@@ -565,6 +598,7 @@
         finished = true;
         clearTimeout(watchdog);
         try { onLand(); } catch (e) { console.error("[METP] turn landing failed", e); }
+        if (underlay) underlay.remove();
         sheet.host.remove();
         slotL.style.visibility = "";
         slotR.style.visibility = "";
