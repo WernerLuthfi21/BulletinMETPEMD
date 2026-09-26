@@ -281,6 +281,12 @@
 
   function loadLeafImage(leaf, status, openBtn, meta) {
     preloadPage(meta).then((pg) => {
+      // A physical flip can hydrate this same leaf synchronously after the
+      // preload resolves. Never append a second image when that happens.
+      if (leaf.querySelector(".leaf-img")) {
+        if (status && status.isConnected) status.remove();
+        return;
+      }
       const img = M.el("img", { class: "leaf-img", src: pg.src, alt: pg.alt, loading: "eager", decoding: "async" });
       leaf.insertBefore(img, status);
       status.remove();
