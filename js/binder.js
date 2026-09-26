@@ -350,33 +350,21 @@
     }
   }
 
-  function animateFlip(dir, target, onMid, isJump) {
-    if (M.reducedMotion()) { onMid(); return; }
-    flipping = true;
-    M.sound && M.sound.flip();
-    const spreadEl2 = binderEl.querySelector(".spread");
-    const fullW = spreadEl2.offsetWidth;
-    const h = spreadEl2.offsetHeight;
-    const w = B.single ? fullW : fullW / 2;
-
-    // Build a temporary flipping leaf that shows: front = current far page,
-    // back = the page it's about to reveal — cast shadows sweep as it turns.
+  // Builds one flipping leaf (a temporary front/back card hinged at its own
+  // spine edge) and returns an updater driven by the shared rAF loop below.
+  // `hinge` is fixed by which physical half this leaf occupies — 'left'
+  // means the spine is at its right edge (visually "hinge: right center"),
+  // 'right' means the spine is at its left edge. The rotation SIGN (which
+  // way it swings) is what encodes forward vs backward, via `dir`.
+  function buildLeafFlipper(spreadEl2, hinge, leftPx, w, frontPg, backPg, dir) {
     const flipper = M.el("div", { class: "flipper" });
     flipper.style.width = w + "px";
-    flipper.style.left = (B.single ? 0 : (dir === 1 ? w : 0)) + "px";
-    flipper.style.transformOrigin = B.single ? "left center" : (dir === 1 ? "left center" : "right center");
+    flipper.style.left = leftPx + "px";
+    flipper.style.transformOrigin = hinge === "right" ? "left center" : "right center";
 
-    const curSpread = B.spreads[B.cur];
-    const targetSpread = B.spreads[target] || [];
-    const frontPg = B.single ? curSpread.find(Boolean) || null : (dir === 1 ? curSpread[1] : curSpread[0]);
-    // For issue-tab jumps, reveal the actual requested destination rather
-    // than an intermediate spread. The destination has already been decoded.
-    const backPg = B.single ? targetSpread.find(Boolean) || null : (dir === 1 ? targetSpread[0] : targetSpread[1]);
-    const frontSide = B.single ? "right" : (dir === 1 ? "right" : "left");
-    const backSide = B.single ? "right" : (dir === 1 ? "left" : "right");
-
-    const front = M.el("div", { class: "face front" }, [buildLeafContent(pageMeta(frontPg), frontSide)]);
-    const back = M.el("div", { class: "face back" }, [buildLeafContent(pageMeta(backPg), backSide)]);
+    const side = hinge === "right" ? "right" : "left";
+    const front = M.el("div", { class: "face front" }, [buildLeafContent(pageMeta(frontPg), side)]);
+    const back = M.el("div", { class: "face back" }, [buildLeafContent(pageMeta(backPg), side)]);
     front.appendChild(M.el("div", { class: "shade" }));
     front.appendChild(M.el("div", { class: "sheen" }));
     back.appendChild(M.el("div", { class: "shade" }));
@@ -384,29 +372,89 @@
     flipper.appendChild(front);
     flipper.appendChild(back);
 
-    const castR = M.el("div", { class: "cast r" });
-    const castL = M.el("div", { class: "cast l" });
-    castR.style.cssText = "left:" + w + "px;width:" + w + "px";
-    castL.style.cssText = "left:0px;width:" + w + "px";
-    spreadEl2.appendChild(castL);
-    spreadEl2.appendChild(castR);
+    // Self-shadow, darkest at the hinge (spine) edge, fading outward —
+    // reuses the existing .cast.l / .cast.r gradients (already authored
+    // for exactly this "dark near spine, fading away" look).
+    const cast = M.el("div", { class: hinge === "right" ? "cast r" : "cast l" });
+    cast.style.cssText = "left:" + leftPx + "px;width:" + w + "px";
+
+    spreadEl2.appendChild(cast);
     spreadEl2.appendChild(flipper);
 
-    // Hide the real leaf underneath while the flipper covers it.
-    (B.single ? slotR : (dir === 1 ? slotR : slotL)).style.visibility = "hidden";
+    const frontShade = front.querySelector(".shade");
+    const backShade = back.querySelector(".shade");
+    const frontSheen = front.querySelector(".sheen");
+    const backSheen = back.querySelector(".sheen");
+
+    function update(eased) {
+      // Both leaves use the SAME signed angle: each rotates in its own
+      // local frame (transform-origin pinned at its own spine edge), and
+      // since those two origins sit on opposite sides of the spread, the
+      // same CSS sign already produces the correct mirrored motion for
+      // each side — no extra per-leaf sign flip needed.
+      const angle = -180 * dir * eased;
+      flipper.style.transform = "rotateY(" + angle + "deg)";
+      const mid = Math.sin(eased * Math.PI); // 0→1→0, peaks mid-flip
+      frontShade.style.opacity = eased < 0.5 ? M.clamp(eased * 2, 0, 1) : 0;
+      backShade.style.opacity = eased > 0.5 ? 1 - (eased - 0.5) * 2 : 0;
+      frontSheen.style.opacity = mid * 0.5;
+      backSheen.style.opacity = mid * 0.5;
+      cast.style.opacity = mid * 0.6;
+    }
+    function destroy() { flipper.remove(); cast.remove(); }
+    return { update, destroy };
+  }
+
+  function animateFlip(dir, target, onMid, isJump) {
+    if (M.reducedMotion()) { onMid(); return Promise.resolve(); }
+    flipping = true;
+    M.sound && M.sound.flip();
+    const spreadEl2 = binderEl.querySelector(".spread");
+    const fullW = spreadEl2.offsetWidth;
+
+    const curSpread = B.spreads[B.cur];
+    const targetSpread = B.spreads[target] || [];
+
+    // Every navigation replaces BOTH visible pages (spreads are built from
+    // sequential, non-overlapping page pairs — there is no page shared
+    // between one spread and the next), so both leaves must flip in sync.
+    // Flipping only one side while the other snapped to its new content
+    // instantly was the source of the flicker/ghosting seen before.
+    const leaves = [];
+    const hiddenSlots = [];
+    if (B.single) {
+      leaves.push(buildLeafFlipper(
+        spreadEl2, "right", 0, fullW,
+        curSpread.find(Boolean) || null, targetSpread.find(Boolean) || null, dir
+      ));
+      hiddenSlots.push(slotR);
+    } else {
+      const w = fullW / 2;
+      leaves.push(buildLeafFlipper(spreadEl2, "left", 0, w, curSpread[0], targetSpread[0], dir));
+      leaves.push(buildLeafFlipper(spreadEl2, "right", w, w, curSpread[1], targetSpread[1], dir));
+      hiddenSlots.push(slotL, slotR);
+    }
+    hiddenSlots.forEach((s) => { s.style.visibility = "hidden"; });
 
     const dur = isJump ? 620 : 680;
     let start;
     return new Promise((resolve) => {
-      let done = false;
-      let watchdog;
+      let done = false, swapped = false, watchdog;
+      function swap() {
+        if (swapped) return;
+        swapped = true;
+        try { onMid(); } catch (e) { console.error("[METP] flip onMid failed", e); }
+      }
+      function cleanup() {
+        leaves.forEach((L) => L.destroy());
+        slotL.style.visibility = ""; slotR.style.visibility = "";
+      }
       function finish() {
         if (done) return;
         done = true;
         clearTimeout(watchdog);
-        try { if (!frame._swapped) { frame._swapped = true; onMid(); } } catch (e) { console.error("[METP] flip onMid failed", e); }
-        flipper.remove(); castL.remove(); castR.remove();
-        slotL.style.visibility = ""; slotR.style.visibility = "";
+        swap(); // guarantee the model/DOM landed even if a frame was skipped
+        cleanup();
         flipping = false;
         resolve();
       }
@@ -416,21 +464,13 @@
           if (start == null) start = ts;
           const t = M.clamp((ts - start) / dur, 0, 1);
           const eased = 1 - Math.pow(1 - t, 3);
-          const angle = dir === 1 ? -180 * eased : 180 * eased;
-          flipper.style.transform = "rotateY(" + angle + "deg)";
-          const mid = Math.sin(eased * Math.PI); // 0→1→0, peaks mid-flip
-          front.querySelector(".shade").style.opacity = M.clamp(eased * 2, 0, 1) * (eased < 0.5 ? 1 : 0);
-          back.querySelector(".shade").style.opacity = eased > 0.5 ? (1 - (eased - 0.5) * 2) : 0;
-          front.querySelector(".sheen").style.opacity = mid * 0.5;
-          back.querySelector(".sheen").style.opacity = mid * 0.5;
-          castL.style.opacity = dir === 1 ? mid * 0.7 : Math.max(0, (0.5 - Math.abs(eased - 0.5)) * 2) * 0.5;
-          castR.style.opacity = dir === 1 ? Math.max(0, (0.5 - Math.abs(eased - 0.5)) * 2) * 0.5 : mid * 0.7;
-          if (eased > 0.5 && !frame._swapped) { frame._swapped = true; onMid(); }
+          leaves.forEach((L) => L.update(eased));
+          if (eased > 0.5) swap();
           if (t < 1) requestAnimationFrame(frame);
           else finish();
         } catch (e) {
-          // A single bad frame must never leave the flipped leaf stuck
-          // mid-turn and the whole binder unresponsive — land it instantly.
+          // A single bad frame must never leave the flip stuck mid-turn
+          // and the whole binder unresponsive — land it instantly.
           console.error("[METP] flip frame failed", e);
           finish();
         }

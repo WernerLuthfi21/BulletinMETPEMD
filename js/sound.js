@@ -66,10 +66,11 @@
   // point of view, just delayed to their first touch.
   const MUSIC_KEY = "metp_music_on";
   const TRACK_KEY = "metp_music_track";
-  const TRACKS = [
-    { id: "ambient", label: "Ambient room tone", src: "assets/audio/ambient-room-tone.m4a" },
-    { id: "astaga", label: "Astaga Bercanda — Akbar Chalay & Mingse", src: "assets/audio/astaga-bercanda.mp3" }
-  ];
+  // Track list lives in data/tracks.js (window.METP_TRACKS) so new songs can
+  // be added without touching this file — see that file for instructions.
+  const TRACKS = (window.METP_TRACKS && window.METP_TRACKS.length)
+    ? window.METP_TRACKS
+    : [{ id: "ambient", label: "Ambient room tone", src: "assets/audio/ambient-room-tone.m4a" }];
 
   function initMusicToggle() {
     const btn = document.getElementById("btnMusic");
