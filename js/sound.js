@@ -64,21 +64,48 @@
   // immediately and, if blocked, start on the very first tap/click/key
   // anywhere on the page instead — still "automatic" from the visitor's
   // point of view, just delayed to their first touch.
+  //
+  // The track list itself is NOT hardcoded here: it's read from
+  // assets/audio/tracks.json, which tools/generate_audio_manifest.py (run
+  // by the "Update audio manifest" GitHub Action on every push that touches
+  // assets/audio/) rebuilds from whatever files are actually in that
+  // folder. Drop a new track in assets/audio/, push, and it appears in the
+  // picker with no code changes. The FALLBACK list below only covers the
+  // two tracks that shipped before the manifest existed, in case the fetch
+  // fails (e.g. opened straight from disk without a server).
   const MUSIC_KEY = "metp_music_on";
   const TRACK_KEY = "metp_music_track";
-  // Track list lives in data/tracks.js (window.METP_TRACKS) so new songs can
-  // be added without touching this file — see that file for instructions.
-  const TRACKS = (window.METP_TRACKS && window.METP_TRACKS.length)
-    ? window.METP_TRACKS
-    : [{ id: "ambient", label: "Ambient room tone", src: "assets/audio/ambient-room-tone.m4a" }];
+  const MANIFEST_URL = "assets/audio/tracks.json";
+  const FALLBACK_TRACKS = [
+    { id: "ambient-room-tone", label: "Ambient Room Tone", src: "assets/audio/ambient-room-tone.m4a" },
+    { id: "astaga-bercanda", label: "Astaga Bercanda", src: "assets/audio/astaga-bercanda.mp3" }
+  ];
 
-  function initMusicToggle() {
+  async function loadTracks() {
+    try {
+      const res = await fetch(MANIFEST_URL, { cache: "no-store" });
+      if (!res.ok) throw new Error("manifest fetch failed");
+      const list = await res.json();
+      if (Array.isArray(list) && list.length) return list;
+      throw new Error("empty manifest");
+    } catch (e) {
+      return FALLBACK_TRACKS;
+    }
+  }
+
+  async function initMusicToggle() {
     const btn = document.getElementById("btnMusic");
     const audio = document.getElementById("bgMusic");
     const picker = document.getElementById("musicTrack");
     if (!btn || !audio) return;
     const icon = btn.querySelector("use");
     audio.volume = 0.5;
+    // Repeat: the visitor's chosen track loops infinitely until they pick
+    // a different one from the dropdown -- no auto-advancing/shuffling
+    // through the list on its own.
+    audio.loop = true;
+
+    const TRACKS = await loadTracks();
 
     if (picker) {
       picker.innerHTML = "";
@@ -97,9 +124,13 @@
     } catch (e) {}
     if (picker) picker.value = trackId;
 
-    function setSrc(id) {
+    function setSrc(id, { keepPosition = false } = {}) {
       const track = TRACKS.find((t) => t.id === id) || TRACKS[0];
+      trackId = track.id;
+      if (!keepPosition) audio.currentTime = 0;
       audio.src = track.src;
+      if (picker) picker.value = trackId;
+      try { localStorage.setItem(TRACK_KEY, trackId); } catch (e) {}
     }
     setSrc(trackId);
 
@@ -148,7 +179,6 @@
       picker.addEventListener("change", () => {
         const wasPlaying = !audio.paused;
         setSrc(picker.value);
-        try { localStorage.setItem(TRACK_KEY, picker.value); } catch (e) {}
         if (wasPlaying) tryPlay();
       });
     }
@@ -177,11 +207,43 @@
     }
   }
 
+  // Cover photo stickers: tap one for a little pop/wiggle, like pressing a
+  // real sticker down onto the binder.
+  function initRealStickers() {
+    document.querySelectorAll(".lid-realsticker").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        btn.classList.remove("is-bouncing");
+        void btn.getBoundingClientRect(); // force reflow so the animation can restart
+        btn.classList.add("is-bouncing");
+      });
+      btn.addEventListener("animationend", () => btn.classList.remove("is-bouncing"));
+    });
+  }
+
+  // Cover chart tag (paperclipped bar-chart tag): tap it for a little pop +
+  // a soft "chirp" sound. It sits on top of the closed cover, which is
+  // itself one big "open the binder" click target — so this must stop the
+  // click from bubbling up, or tapping the tag would open the binder too.
+  function initChartTag() {
+    const btn = document.getElementById("lidChartTag");
+    if (!btn) return;
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      M.sound.tagPop();
+      btn.classList.remove("is-bouncing");
+      void btn.getBoundingClientRect(); // force reflow so the animation can restart
+      btn.classList.add("is-bouncing");
+    });
+    btn.addEventListener("animationend", () => btn.classList.remove("is-bouncing"));
+  }
+
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => { initMusicToggle(); initCoffeeCup(); });
+    document.addEventListener("DOMContentLoaded", () => { initMusicToggle(); initCoffeeCup(); initRealStickers(); initChartTag(); });
   } else {
     initMusicToggle();
     initCoffeeCup();
+    initRealStickers();
+    initChartTag();
   }
 
   M.sound = {
@@ -210,6 +272,14 @@
         const t0 = c.currentTime;
         chime(c, t0, 1760, 0.35, 0.05);        // bright glass "cling" (A6)
         chime(c, t0 + 0.02, 2637, 0.28, 0.028); // shimmer overtone (E7)
+      });
+    },
+    tagPop() {
+      safe((c) => {
+        const t0 = c.currentTime;
+        noiseBurst(c, t0, 0.08, 0.1, 2600);     // tiny paper "tak"
+        chime(c, t0 + 0.01, 900, 0.16, 0.045);  // quick upward chirp — the "jump"
+        chime(c, t0 + 0.05, 1500, 0.13, 0.032);
       });
     }
   };

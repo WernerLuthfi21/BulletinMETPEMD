@@ -52,6 +52,7 @@
   function preloadPage(meta) {
     const key = pageKey(meta);
     if (!key) return Promise.resolve(null);
+    if (meta.issue.spread) return Promise.resolve(null); // block-based page: nothing to fetch/decode
     if (pageCache.has(key)) return pageCache.get(key);
     const promise = meta.issue.getPage(meta.pageIndex, { preview: true }).then((pg) => {
       const src = pg.src;
@@ -197,6 +198,11 @@
       leaf.appendChild(buildPlaceholder(meta));
       return leaf;
     }
+    if (meta.issue.spread) {
+      leaf.classList.add("leaf-plain");
+      leaf.appendChild(buildSpreadPage(meta));
+      return leaf;
+    }
     const status = M.el("div", { class: "leaf-status" }, [
       M.el("div", { class: "spinner", "aria-hidden": "true" }),
       M.el("span", { text: "Loading page\u2026" })
@@ -206,6 +212,71 @@
     leaf.appendChild(openBtn);
     loadLeafImage(leaf, status, openBtn, meta);
     return leaf;
+  }
+
+  /* ---------- data-driven spread pages: month -> left/right -> blocks ----------
+     Fully defensive: a missing/disabled side renders as blank paper, and a
+     malformed block is skipped (with a console warning) rather than ever
+     breaking the page or crashing the app — see data/issues.js `spread`. */
+  function buildSpreadPage(meta) {
+    const side = meta.issue.spread ? (meta.pageIndex === 0 ? meta.issue.spread.left : meta.issue.spread.right) : null;
+    const wrap = M.el("div", { class: "page-content" });
+    if (!side || side.enabled === false) {
+      wrap.classList.add("page-content-blank");
+      return wrap;
+    }
+    const blocks = Array.isArray(side.blocks) ? side.blocks : [];
+    renderBlocks(wrap, blocks);
+    return wrap;
+  }
+
+  function renderBlocks(container, blocks) {
+    blocks.forEach((raw, i) => {
+      let el = null;
+      try { el = renderBlock(raw); }
+      catch (e) { console.warn("[METP] skipped malformed content block at index " + i, raw, e); }
+      if (el) container.appendChild(el);
+    });
+  }
+
+  function renderBlock(b) {
+    if (!b || typeof b !== "object" || typeof b.type !== "string") return null;
+    switch (b.type) {
+      case "label":
+        return b.text ? M.el("div", { class: "blk-label" + (b.variant ? " blk-label-" + b.variant : ""), text: b.text }) : null;
+      case "heading":
+        return b.text ? M.el(b.level === 1 ? "h2" : "h3", { class: "blk-heading blk-heading-" + (b.level === 1 ? "1" : "2"), text: b.text }) : null;
+      case "subheading":
+        return b.text ? M.el("p", { class: "blk-subheading", text: b.text }) : null;
+      case "text":
+        return b.text ? M.el("p", { class: "blk-text", text: b.text }) : null;
+      case "quote": {
+        if (!b.text) return null;
+        const children = [M.el("p", { text: b.text })];
+        if (b.cite) children.push(M.el("cite", { text: b.cite }));
+        return M.el("blockquote", { class: "blk-quote" }, children);
+      }
+      case "divider":
+        return M.el("hr", { class: "blk-divider" });
+      case "image": {
+        if (!b.src) return null;
+        const img = M.el("img", { src: b.src, alt: b.alt || "", loading: "lazy" });
+        if (b.objectPosition) img.style.objectPosition = b.objectPosition;
+        const kids = [img];
+        if (b.caption) kids.push(M.el("figcaption", { text: b.caption }));
+        return M.el("figure", { class: "blk-image" }, kids);
+      }
+      case "button":
+        if (!b.text) return null;
+        return b.href
+          ? M.el("a", { class: "blk-button", href: b.href, target: "_blank", rel: "noopener", text: b.text })
+          : M.el("span", { class: "blk-button", text: b.text });
+      case "divider-space":
+        return M.el("div", { class: "blk-space" });
+      default:
+        console.warn("[METP] unknown content block type, skipped:", b.type);
+        return null;
+    }
   }
 
   function loadLeafImage(leaf, status, openBtn, meta) {
@@ -281,7 +352,9 @@
       issueTitleEl.textContent = curPage.issue.label + (curPage.issue.title ? " \u2014 " + curPage.issue.title : "");
       btnOriginal.hidden = false;
       curPage.issue.getUrl().then((u) => (btnOriginal.href = u)).catch(() => { btnOriginal.hidden = true; });
-      btnRead.hidden = false;
+      // Block-based pages (data-driven spread content) have no page image to
+      // zoom into, so "Read" (the reader's zoom view) doesn't apply to them.
+      btnRead.hidden = !!curPage.issue.spread;
       cardTitle.textContent = curPage.issue.label + (curPage.issue.title ? " \u2014 \u201C" + curPage.issue.title + "\u201D" : "");
       renderCredits(curPage.issue);
     } else {
