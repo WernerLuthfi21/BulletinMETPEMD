@@ -403,204 +403,210 @@
     return n;
   }
 
-  /* ---------- page-flip animation (true 3D flip, not a swap) ---------- */
+  /* ---------- page-flip animation: one physical sheet ---------- */
   let flipping = false;
   let navigationBusy = false;
-  // How long a page-turn will wait for the destination image to finish
-  // decoding before it turns anyway. Keeping this short is what makes the
-  // flip feel instant/seamless even when a page hasn't been warmed yet —
-  // the destination leaf has its own spinner and swaps the image in the
-  // moment it's ready, so nothing is ever blocked on a slow network or a
-  // slow PDF render.
-  const WARM_BUDGET = 450;
+
+  // A spread is a real book spread: LEFT stays fixed while the RIGHT sheet
+  // turns forward. The back of that sheet is the destination LEFT page.
+  // Going backward is the exact mirror: LEFT turns to the RIGHT and its back
+  // is the destination RIGHT page. This is the key invariant that prevents
+  // the old "two cards spinning at once" artifact.
+  const FLIP_MS = 880;
+  const OPEN_MS = 920;
+
+  function leafNode(slot) {
+    return slot && slot.firstElementChild ? slot.firstElementChild : null;
+  }
+
+  async function ensureSpreadReady(spread) {
+    const pages = (spread || []).filter(Boolean);
+    // Never start a physical turn while its destination is still a spinner.
+    // Data-driven HTML spreads resolve immediately; image/PDF pages are warmed
+    // through the existing preview cache.
+    try {
+      await Promise.all(pages.map((p) => preloadPage(p)));
+    } catch (e) {
+      // A failed page is allowed to render its retry state; the animation
+      // itself must remain usable.
+    }
+  }
+
+  function makeTurnSheet(sourceNode, backNode, dir) {
+    const host = M.el("div", { class: "physical-turn" });
+    host.setAttribute("aria-hidden", "true");
+    const rect = spreadEl.getBoundingClientRect();
+    const half = B.single ? rect.width : rect.width / 2;
+    const isForward = dir > 0;
+    host.style.width = (B.single ? rect.width : half) + "px";
+    host.style.left = (B.single ? 0 : (isForward ? half : 0)) + "px";
+    host.style.transformOrigin = isForward ? "left center" : "right center";
+
+    const front = M.el("div", { class: "physical-turn-face front" });
+    const back = M.el("div", { class: "physical-turn-face back" });
+    front.appendChild(sourceNode.cloneNode(true));
+    back.appendChild(backNode ? backNode.cloneNode(true) : buildLeafContent(null, isForward ? "left" : "right"));
+
+    const frontShade = M.el("div", { class: "physical-turn-shade" });
+    const backShade = M.el("div", { class: "physical-turn-shade" });
+    front.appendChild(frontShade);
+    back.appendChild(backShade);
+
+    host.appendChild(front);
+    host.appendChild(back);
+    spreadEl.appendChild(host);
+
+    return { host, front, back, frontShade, backShade };
+  }
+
+  function updateTurn(sheet, p, dir) {
+    // Quintic smoothstep: starts/ends softly, with no abrupt velocity change.
+    const e = p < .5
+      ? 16 * Math.pow(p, 5)
+      : 1 - Math.pow(-2 * p + 2, 5) / 2;
+    const angle = (dir > 0 ? -180 : 180) * e;
+
+    // Small Z lift + Y skew sells paper thickness without turning the page
+    // into a rigid rotating card.
+    const bow = Math.sin(Math.PI * e);
+    const skew = (dir > 0 ? -1 : 1) * bow * 0.9;
+    sheet.host.style.transform =
+      "rotateY(" + angle.toFixed(3) + "deg) translateZ(" + (bow * 20).toFixed(2) + "px) skewY(" + skew.toFixed(3) + "deg)";
+
+    // Light moves across the sheet as it crosses edge-on.
+    sheet.frontShade.style.opacity = String(Math.min(.48, bow * .42 + (p > .52 ? .06 : 0)));
+    sheet.backShade.style.opacity = String(Math.min(.38, bow * .30));
+    sheet.front.style.filter = "brightness(" + (1 - bow * .10).toFixed(3) + ")";
+    sheet.back.style.filter = "brightness(" + (1 - bow * .06).toFixed(3) + ")";
+  }
+
+  function animatePhysicalTurn(dir, target, viaTab) {
+    const current = B.spreads[B.cur] || [];
+    const destination = B.spreads[target] || [];
+    const spreadWidth = spreadEl.getBoundingClientRect().width;
+
+    if (B.single) {
+      const source = leafNode(slotR);
+      if (!source) return Promise.resolve();
+      const back = destination.find(Boolean) ? buildLeafContent(pageMeta(destination.find(Boolean)), "right") : null;
+      const sheet = makeTurnSheet(source, back, dir);
+      slotR.style.visibility = "hidden";
+      return runPhysicalTurn(sheet, dir, () => {
+        B.cur = target;
+        if (!viaTab) {
+          const first = destination.find((p) => p && !p.placeholder);
+          if (first) B.selectedIssueId = first.issue.id;
+        }
+        renderSpreadCore();
+      });
+    }
+
+    if (dir > 0) {
+      // Forward: current RIGHT page physically turns left.
+      // Destination LEFT page is its back; destination RIGHT is already
+      // rendered underneath and stays completely still.
+      const source = leafNode(slotR);
+      const destinationLeft = destination[0] || null;
+      const back = destinationLeft ? buildLeafContent(pageMeta(destinationLeft), "left") : null;
+      if (!source) return Promise.resolve();
+
+      const sheet = makeTurnSheet(source, back, dir);
+      slotR.style.visibility = "hidden";
+      // Keep current LEFT visible until the moving sheet covers it. The target
+      // RIGHT page is inserted only after the turn, so there is no blank flash.
+      return runPhysicalTurn(sheet, dir, () => {
+        B.cur = target;
+        if (!viaTab) {
+          const first = destination.find((p) => p && !p.placeholder);
+          if (first) B.selectedIssueId = first.issue.id;
+        }
+        renderSpreadCore();
+      });
+    }
+
+    // Backward: current LEFT page physically turns right.
+    const source = leafNode(slotL);
+    const destinationRight = destination[1] || destination[0] || null;
+    const back = destinationRight ? buildLeafContent(pageMeta(destinationRight), "right") : null;
+    if (!source) return Promise.resolve();
+
+    const sheet = makeTurnSheet(source, back, dir);
+    slotL.style.visibility = "hidden";
+    return runPhysicalTurn(sheet, dir, () => {
+      B.cur = target;
+      if (!viaTab) {
+        const first = destination.find((p) => p && !p.placeholder);
+        if (first) B.selectedIssueId = first.issue.id;
+      }
+      renderSpreadCore();
+    });
+  }
+
+  function runPhysicalTurn(sheet, dir, onLand) {
+    if (M.reducedMotion()) {
+      onLand();
+      sheet.host.remove();
+      slotL.style.visibility = "";
+      slotR.style.visibility = "";
+      return Promise.resolve();
+    }
+
+    flipping = true;
+    M.sound && M.sound.flip();
+
+    const duration = FLIP_MS;
+    let start = null;
+    return new Promise((resolve) => {
+      let finished = false;
+      let watchdog;
+
+      function finish() {
+        if (finished) return;
+        finished = true;
+        clearTimeout(watchdog);
+        try { onLand(); } catch (e) { console.error("[METP] turn landing failed", e); }
+        sheet.host.remove();
+        slotL.style.visibility = "";
+        slotR.style.visibility = "";
+        flipping = false;
+        resolve();
+      }
+
+      function frame(ts) {
+        if (finished) return;
+        if (start == null) start = ts;
+        const p = M.clamp((ts - start) / duration, 0, 1);
+        updateTurn(sheet, p, dir);
+        if (p < 1) requestAnimationFrame(frame);
+        else finish();
+      }
+
+      watchdog = setTimeout(finish, duration + 1000);
+      requestAnimationFrame(frame);
+    });
+  }
+
   async function goToSpread(target, viaTab) {
     target = M.clamp(target, 0, B.spreads.length - 1);
-    if (target === B.cur || flipping || navigationBusy || !B.spreads.length) return;
+    if (target === B.cur || flipping || navigationBusy || !B.spreads.length || !B.opened) return;
+
     const dir = target > B.cur ? 1 : -1;
     navigationBusy = true;
     try {
-      // Give the destination a brief head start to decode, but never let a
-      // slow or failed fetch hold the whole interface hostage — a caught
-      // failure here just means the flip proceeds and the leaf shows its
-      // own loading/retry state once the flip lands.
-      await Promise.race([warmSpread(B.spreads[target]).catch(() => {}), M.delay(WARM_BUDGET)]);
+      // Warm the exact destination before creating the moving leaf. This is
+      // intentionally a hard prerequisite for animation: a spinner must
+      // never become the face of a moving page.
+      await ensureSpreadReady(B.spreads[target]);
       if (target === B.cur || flipping) return;
-      await animateFlip(dir, target, () => {
-        B.cur = target;
-        if (!viaTab) {
-          const first = (B.spreads[target] || []).find((p) => p && !p.placeholder);
-          if (first) B.selectedIssueId = first.issue.id;
-        }
-        // Only the minimal slot swap happens on the animation's own clock —
-        // see renderSpreadCore's comment for why. The tab strip and header
-        // are refreshed right after, once the flip has actually landed.
-        renderSpreadCore();
-      }, viaTab);
+      await animatePhysicalTurn(dir, target, viaTab);
       renderMeta();
       renderTabs();
     } catch (err) {
-      // Should be unreachable now (animateFlip never rejects), but guarantee
-      // the interface is never left stuck if something unexpected throws.
       console.error("[METP] page turn failed", err);
-      flipping = false;
       renderSpread();
     } finally {
       navigationBusy = false;
     }
-  }
-
-  // Builds one flipping leaf (a temporary front/back card hinged at its own
-  // spine edge) and returns an updater driven by the shared rAF loop below.
-  // `hinge` is fixed by which physical half this leaf occupies — 'left'
-  // means the spine is at its right edge (visually "hinge: right center"),
-  // 'right' means the spine is at its left edge. The rotation SIGN (which
-  // way it swings) is what encodes forward vs backward, via `dir`.
-  function buildLeafFlipper(spreadEl2, hinge, leftPx, w, frontPg, backPg, dir, phase) {
-    const flipper = M.el("div", { class: "flipper" });
-    flipper.style.width = w + "px";
-    flipper.style.left = leftPx + "px";
-    flipper.style.transformOrigin = hinge === "right" ? "left center" : "right center";
-    phase = phase || 0;
-
-    const side = hinge === "right" ? "right" : "left";
-    const front = M.el("div", { class: "face front" }, [buildLeafContent(pageMeta(frontPg), side)]);
-    const back = M.el("div", { class: "face back" }, [buildLeafContent(pageMeta(backPg), side)]);
-    front.appendChild(M.el("div", { class: "shade" }));
-    front.appendChild(M.el("div", { class: "sheen" }));
-    back.appendChild(M.el("div", { class: "shade" }));
-    back.appendChild(M.el("div", { class: "sheen" }));
-    flipper.appendChild(front);
-    flipper.appendChild(back);
-
-    // Self-shadow, darkest at the hinge (spine) edge, fading outward —
-    // reuses the existing .cast.l / .cast.r gradients (already authored
-    // for exactly this "dark near spine, fading away" look).
-    const cast = M.el("div", { class: hinge === "right" ? "cast r" : "cast l" });
-    cast.style.cssText = "left:" + leftPx + "px;width:" + w + "px";
-
-    spreadEl2.appendChild(cast);
-    spreadEl2.appendChild(flipper);
-
-    const frontShade = front.querySelector(".shade");
-    const backShade = back.querySelector(".shade");
-    const frontSheen = front.querySelector(".sheen");
-    const backSheen = back.querySelector(".sheen");
-
-    function update(t) {
-      // `t` is the shared, un-eased master clock (0→1) for the whole turn.
-      // Each leaf runs its OWN eased progress from a slightly offset start
-      // (`phase`), so the two leaves do NOT pass through the edge-on 90°
-      // point at the same instant. Doing it in perfect lockstep is what
-      // made the turn read as a spinning fan/pinwheel: both panels would
-      // collapse to an invisible sliver and pop back out simultaneously.
-      // A small stagger turns that into a believable "one side leads,
-      // the other follows a beat later" page turn, like a real hand lifting
-      // one edge first.
-      const local = M.clamp((t - phase) / (1 - phase), 0, 1);
-      const eased = 1 - Math.pow(1 - local, 3);
-      // Both leaves use the SAME signed angle: each rotates in its own
-      // local frame (transform-origin pinned at its own spine edge), and
-      // since those two origins sit on opposite sides of the spread, the
-      // same CSS sign already produces the correct mirrored motion for
-      // each side — no extra per-leaf sign flip needed.
-      const angle = -180 * dir * eased;
-      const mid = Math.sin(eased * Math.PI); // 0→1→0, peaks mid-flip
-      // A real sheet of paper bows slightly as it turns rather than
-      // staying a perfectly rigid flat plane — a small forward bulge
-      // (translateZ) at the midpoint sells "paper", not "spinning card".
-      flipper.style.transform = "rotateY(" + angle + "deg) translateZ(" + (mid * 16) + "px)";
-      frontShade.style.opacity = eased < 0.5 ? M.clamp(eased * 2, 0, 1) : 0;
-      backShade.style.opacity = eased > 0.5 ? 1 - (eased - 0.5) * 2 : 0;
-      frontSheen.style.opacity = mid * 0.5;
-      backSheen.style.opacity = mid * 0.5;
-      cast.style.opacity = mid * 0.6;
-    }
-    function destroy() { flipper.remove(); cast.remove(); }
-    return { update, destroy };
-  }
-
-  function animateFlip(dir, target, onMid, isJump) {
-    if (M.reducedMotion()) { onMid(); return Promise.resolve(); }
-    flipping = true;
-    M.sound && M.sound.flip();
-    const spreadEl2 = binderEl.querySelector(".spread");
-    const fullW = spreadEl2.offsetWidth;
-
-    const curSpread = B.spreads[B.cur];
-    const targetSpread = B.spreads[target] || [];
-
-    // Every navigation replaces BOTH visible pages (spreads are built from
-    // sequential, non-overlapping page pairs — there is no page shared
-    // between one spread and the next), so both leaves must flip in sync.
-    // Flipping only one side while the other snapped to its new content
-    // instantly was the source of the flicker/ghosting seen before.
-    const leaves = [];
-    const hiddenSlots = [];
-    if (B.single) {
-      leaves.push(buildLeafFlipper(
-        spreadEl2, "right", 0, fullW,
-        curSpread.find(Boolean) || null, targetSpread.find(Boolean) || null, dir, 0
-      ));
-      hiddenSlots.push(slotR);
-    } else {
-      const w = fullW / 2;
-      // The leaf nearer the spine on the side the turn is heading TOWARD
-      // leads by a beat; the trailing leaf follows — see the comment in
-      // buildLeafFlipper's update() for why this stagger matters.
-      const rightLeads = dir > 0;
-      leaves.push(buildLeafFlipper(spreadEl2, "left", 0, w, curSpread[0], targetSpread[0], dir, rightLeads ? 0.12 : 0));
-      leaves.push(buildLeafFlipper(spreadEl2, "right", w, w, curSpread[1], targetSpread[1], dir, rightLeads ? 0 : 0.12));
-      hiddenSlots.push(slotL, slotR);
-    }
-    hiddenSlots.forEach((s) => { s.style.visibility = "hidden"; });
-
-    const dur = isJump ? 680 : 760;
-    let start;
-    return new Promise((resolve) => {
-      let done = false, swapped = false, watchdog;
-      function swap() {
-        if (swapped) return;
-        swapped = true;
-        try { onMid(); } catch (e) { console.error("[METP] flip onMid failed", e); }
-      }
-      function cleanup() {
-        leaves.forEach((L) => L.destroy());
-        slotL.style.visibility = ""; slotR.style.visibility = "";
-      }
-      function finish() {
-        if (done) return;
-        done = true;
-        clearTimeout(watchdog);
-        swap(); // guarantee the model/DOM landed even if a frame was skipped
-        cleanup();
-        flipping = false;
-        resolve();
-      }
-      function frame(ts) {
-        if (done) return;
-        try {
-          if (start == null) start = ts;
-          const t = M.clamp((ts - start) / dur, 0, 1);
-          leaves.forEach((L) => L.update(t));
-          // Swap once the slower (trailing/phase-delayed) leaf has passed
-          // its own halfway point, so the model/DOM never lands before the
-          // visible turn does.
-          if (t > 0.56) swap();
-          if (t < 1) requestAnimationFrame(frame);
-          else finish();
-        } catch (e) {
-          // A single bad frame must never leave the flip stuck mid-turn
-          // and the whole binder unresponsive — land it instantly.
-          console.error("[METP] flip frame failed", e);
-          finish();
-        }
-      }
-      // Absolute safety valve: if rAF ever stops being called for this flip
-      // (e.g. the tab was backgrounded at just the wrong moment), force the
-      // turn to complete instead of leaving the interface locked forever.
-      watchdog = setTimeout(finish, dur + 1500);
-      requestAnimationFrame(frame);
-    });
   }
 
   /* ---------- drag / swipe / tap on the corner peel ----------
@@ -631,51 +637,115 @@
   /* ---------- opening / closing animation ---------- */
   const lid = document.getElementById("lid");
   const stickerEl = document.querySelector(".sticker");
+  let coverMotion = false;
+  let currentSpreadReady = false;
+
+  async function waitForCurrentSpread() {
+    await ensureSpreadReady(B.spreads[B.cur]);
+    currentSpreadReady = true;
+  }
+
   function openBinder() {
-    if (B.opened || flipping || navigationBusy) return;
-    B.opened = true;
-    binderEl.setAttribute("data-state", "open");
+    if (B.opened || coverMotion || flipping || navigationBusy) return;
+    coverMotion = true;
     lid.setAttribute("tabindex", "-1");
+    lid.style.pointerEvents = "none";
     M.sound && M.sound.open();
-    if (M.reducedMotion()) { lid.style.opacity = "0"; lid.style.pointerEvents = "none"; return; }
+
+    // IMPORTANT: remain data-state=closed until the physical cover has
+    // completely cleared the pages. The old implementation set "open" on
+    // frame 0, which made the spread/rings/bar appear underneath a still
+    // rotating cover and produced the giant mid-air artifact.
+    binderEl.setAttribute("data-state", "closed");
     lid.style.opacity = "1";
     lid.style.transformOrigin = "left center";
-    const dur = 900;
-    let start;
-    function frame(ts) {
-      if (start == null) start = ts;
-      const t = M.clamp((ts - start) / dur, 0, 1);
-      const eased = 1 - Math.pow(1 - t, 3);
-      lid.style.transform = "rotateY(" + (-eased * 178) + "deg)";
-      lid.querySelector(".front .shade").style.opacity = M.clamp(eased * 1.6, 0, 1) * (1 - eased);
-      if (t < 1) requestAnimationFrame(frame);
-      else { lid.style.opacity = "0"; lid.style.pointerEvents = "none"; }
-    }
-    requestAnimationFrame(frame);
+    lid.style.transform = "rotateY(0deg)";
+
+    const ready = currentSpreadReady ? Promise.resolve() : waitForCurrentSpread();
+    ready.then(() => new Promise((resolve) => {
+      if (M.reducedMotion()) { resolve(); return; }
+
+      const duration = OPEN_MS;
+      let start = null;
+      function frame(ts) {
+        if (start == null) start = ts;
+        const p = M.clamp((ts - start) / duration, 0, 1);
+        const e = 1 - Math.pow(1 - p, 3);
+        lid.style.transform = "rotateY(" + (-178 * e) + "deg)";
+        const shade = lid.querySelector(".front .shade");
+        if (shade) shade.style.opacity = String(Math.min(.82, e * 1.25) * (1 - e));
+        if (p < 1) requestAnimationFrame(frame);
+        else resolve();
+      }
+      requestAnimationFrame(frame);
+    })).then(() => {
+      // Only now does the inside become visible. The first painted open frame
+      // therefore contains the complete current spread, never a blank sheet.
+      B.opened = true;
+      binderEl.setAttribute("data-state", "open");
+      lid.style.opacity = "0";
+      lid.style.pointerEvents = "none";
+      lid.style.transform = "rotateY(-178deg)";
+      coverMotion = false;
+    }).catch((e) => {
+      console.error("[METP] binder open failed", e);
+      lid.style.transform = "rotateY(0deg)";
+      coverMotion = false;
+      lid.style.pointerEvents = "";
+    });
   }
+
   function closeBinder() {
-    if (!B.opened || flipping || navigationBusy) return;
-    B.opened = false;
-    lid.setAttribute("tabindex", "0");
-    lid.style.pointerEvents = "";
+    if (!B.opened || coverMotion || flipping || navigationBusy) return;
+    coverMotion = true;
     M.sound && M.sound.close();
-    if (M.reducedMotion()) { binderEl.setAttribute("data-state", "closed"); lid.style.opacity = "1"; lid.style.transform = "rotateY(0deg)"; return; }
+
+    // Keep the inside in the OPEN state while the cover is travelling back.
+    // Switching to closed only after the last frame prevents the contents,
+    // rings and bar from disappearing through the cover mid-motion.
+    binderEl.setAttribute("data-state", "open");
+    lid.style.pointerEvents = "none";
     lid.style.opacity = "1";
-    const dur = 750;
-    let start;
+    lid.style.transformOrigin = "left center";
+
+    if (M.reducedMotion()) {
+      lid.style.transform = "rotateY(0deg)";
+      B.opened = false;
+      binderEl.setAttribute("data-state", "closed");
+      lid.style.opacity = "1";
+      lid.style.pointerEvents = "";
+      lid.setAttribute("tabindex", "0");
+      coverMotion = false;
+      return;
+    }
+
+    const duration = OPEN_MS;
+    let start = null;
     function frame(ts) {
       if (start == null) start = ts;
-      const t = M.clamp((ts - start) / dur, 0, 1);
-      const eased = t * t * (3 - 2 * t);
-      lid.style.transform = "rotateY(" + (-178 + eased * 178) + "deg)";
-      lid.querySelector(".front .shade").style.opacity = M.clamp((1 - eased) * 1.6, 0, 1) * eased;
-      if (t < 1) requestAnimationFrame(frame);
-      else binderEl.setAttribute("data-state", "closed");
+      const p = M.clamp((ts - start) / duration, 0, 1);
+      const e = p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+      lid.style.transform = "rotateY(" + (-178 + 178 * e) + "deg)";
+      const shade = lid.querySelector(".front .shade");
+      if (shade) shade.style.opacity = String(Math.min(.82, (1 - e) * 1.25) * e);
+      if (p < 1) requestAnimationFrame(frame);
+      else {
+        B.opened = false;
+        binderEl.setAttribute("data-state", "closed");
+        lid.style.transform = "rotateY(0deg)";
+        lid.style.opacity = "1";
+        lid.style.pointerEvents = "";
+        lid.setAttribute("tabindex", "0");
+        coverMotion = false;
+      }
     }
     requestAnimationFrame(frame);
   }
+
   lid.addEventListener("click", openBinder);
-  lid.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openBinder(); } });
+  lid.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openBinder(); }
+  });
   document.getElementById("lidOpen").addEventListener("click", (e) => { e.stopPropagation(); openBinder(); });
   if (stickerEl) {
     stickerEl.setAttribute("role", "button");
@@ -699,6 +769,9 @@
     B.selectedIssueId = B.issues[B.issues.length - 1].id;
     renderSpread();
     renderTabs();
+    // Warm the visible spread immediately. Opening is allowed to animate only
+    // after this promise resolves, so the first open frame cannot be blank.
+    waitForCurrentSpread();
     // Warm every available page in the background. The current and adjacent
     // spreads are prioritized so first interaction is already seamless.
     warmSpread(B.spreads[B.cur]);
