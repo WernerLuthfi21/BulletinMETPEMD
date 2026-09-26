@@ -307,7 +307,11 @@ img{max-width:100%}
 }
 .hint.on{opacity:1;transform:translate(-50%,0)}
 
-/* ---------- physical binder page turn ---------- */\n.physical-turn-underlay{
+/* ---------- physical binder page turn ----------
+   Reference model: one sheet, two faces, preserve-3d, and a bound-edge
+   transform-origin. This keeps the page behaving like paper instead of a
+   rigid floating card. */
+.physical-turn-underlay{
   position:absolute;top:0;height:100%;z-index:2;pointer-events:none;
   overflow:hidden;background:#faf5e8;
 }
@@ -318,30 +322,40 @@ img{max-width:100%}
 .physical-turn{
   position:absolute;top:0;height:100%;z-index:20;pointer-events:none;
   transform-style:preserve-3d;-webkit-transform-style:preserve-3d;
-  will-change:transform;backface-visibility:visible;
-  box-shadow:0 0 0 rgba(0,0,0,0);
+  backface-visibility:visible;-webkit-backface-visibility:visible;
+  perspective:2200px;will-change:transform;
+  transform-origin:center center;
 }
 .physical-turn-face{
   position:absolute;inset:0;overflow:hidden;
   background:#faf5e8;
   backface-visibility:hidden;-webkit-backface-visibility:hidden;
   transform-style:preserve-3d;-webkit-transform-style:preserve-3d;
-  box-shadow:0 8px 12px rgba(18,7,3,.20);
+  border:1px solid rgba(60,45,28,.10);
+  box-shadow:0 5px 10px rgba(18,7,3,.14);
 }
-.physical-turn-face.front{transform:rotateY(0deg)}
-.physical-turn-face.back{transform:rotateY(180deg)}
+.physical-turn-face.front{transform:rotateY(0deg) translateZ(.7px)}
+.physical-turn-face.back{transform:rotateY(180deg) translateZ(.7px)}
 .physical-turn-face .leaf{
   position:absolute;inset:0;width:100%;height:100%;
 }
+/* The narrow inner-edge gradient is deliberately asymmetric: it follows the
+   hinge, like the page-lighting in the supplied CSS reference. */
 .physical-turn-shade{
   position:absolute;inset:0;z-index:8;pointer-events:none;
-  background:linear-gradient(90deg,rgba(8,3,1,.42),rgba(8,3,1,.08) 48%,transparent 82%);
+  background:
+    linear-gradient(90deg,rgba(8,3,1,.38),rgba(8,3,1,.08) 20%,transparent 58%),
+    linear-gradient(100deg,transparent 35%,rgba(255,255,255,.16) 50%,transparent 66%);
   mix-blend-mode:multiply;
 }
 .physical-turn-face.back .physical-turn-shade{
-  background:linear-gradient(90deg,transparent 18%,rgba(8,3,1,.08) 52%,rgba(8,3,1,.34));
+  background:
+    linear-gradient(90deg,transparent 28%,rgba(8,3,1,.06) 62%,rgba(8,3,1,.30)),
+    linear-gradient(80deg,transparent 36%,rgba(255,255,255,.12) 50%,transparent 64%);
 }
 @media (prefers-reduced-motion:reduce){
+  .physical-turn{transition:none!important}
+}
   .physical-turn{transition:none!important}
 }
 
