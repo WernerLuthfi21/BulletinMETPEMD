@@ -895,17 +895,26 @@
   }
 
   function coverTransform(progress, opening) {
-    // A real cover has momentum: it starts gently, moves through the middle
-    // with weight, then settles into the flat position. The old cubic path
-    // exposed the cover as a rigid card and, worse, the parent binder jumped
-    // sideways at the end. Keep the hinge point fixed while the whole binder
-    // transitions from its closed presentation to its open presentation.
-    const e = .5 - .5 * Math.cos(Math.PI * M.clamp(progress, 0, 1));
-    const settle = Math.sin(Math.PI * e);
-    const angle = (opening ? -178 : 0) + (opening ? -1 : 1) * 1.8 * settle;
-    const lift = settle * 5.5;
-    const pitch = (opening ? -1 : 1) * settle * 0.55;
-    return "translateZ(" + lift.toFixed(2) + "px) rotateY(" + angle.toFixed(3) + "deg) rotateX(" + pitch.toFixed(3) + "deg)";
+    // Deliberately keep the front artwork facing the viewer. Instead of
+    // rotating a single card through 180deg (which exposes mirrored artwork
+    // on browsers with nested 3D compositing quirks), the cover performs a
+    // soft hinge-like pull: a small Y rotation, a gentle Z twist, depth lift,
+    // and a controlled slide off the pages. No backside is ever shown.
+    const p = M.clamp(progress, 0, 1);
+    const e = .5 - .5 * Math.cos(Math.PI * p);
+    const s = Math.sin(Math.PI * e);
+    const w = Math.max(1, lid.getBoundingClientRect().width || 1);
+    const distance = w * 1.08;
+    const x = opening ? -distance * e : -distance * (1 - e);
+    const ry = -24 * s;
+    const rz = -5.5 * s;
+    const lift = 8 * s;
+    const squeeze = 1 - .025 * s;
+    return "translateX(" + x.toFixed(2) + "px) " +
+      "translateZ(" + lift.toFixed(2) + "px) " +
+      "rotateY(" + ry.toFixed(3) + "deg) " +
+      "rotateZ(" + rz.toFixed(3) + "deg) " +
+      "scaleX(" + squeeze.toFixed(4) + ")";
   }
 
   async function waitForCurrentSpread() {
@@ -919,39 +928,36 @@
     forceCoverPaint();
     lid.setAttribute("tabindex", "-1");
     lid.style.pointerEvents = "none";
+    lid.style.visibility = "visible";
+    lid.style.opacity = "1";
 
     const closedX = closedBinderX();
 
-    // Keep the CLOSED geometry for frame 0. The parent then glides toward its
-    // open position at the same time the cover swings around the spine. This
-    // removes the visible "teleport" that previously made the cover appear
-    // as a huge detached card.
     binderEl.setAttribute("data-state", "closed");
     binderEl.setAttribute("data-motion", "opening");
     setBinderX(closedX);
-    lid.style.opacity = "1";
     lid.style.transformOrigin = "left center";
     lid.style.transform = coverTransform(0, true);
 
     const ready = currentSpreadReady ? Promise.resolve(true) : waitForCurrentSpread();
     ready.then((ok) => new Promise((resolve) => {
-      // If the current page failed to warm, still open — but do it with the
-      // retry state already present instead of exposing a blank frame.
       if (!ok) renderSpreadCore();
       M.sound && M.sound.open();
-      if (false && M.reducedMotion()) { resolve(); return; }
 
       const duration = OPEN_MS;
       const startX = closedX;
       let start = null;
+
       function frame(ts) {
         if (start == null) start = ts;
         const p = M.clamp((ts - start) / duration, 0, 1);
         const e = .5 - .5 * Math.cos(Math.PI * p);
         setBinderX(startX * (1 - e));
         lid.style.transform = coverTransform(p, true);
+
         const shade = lid.querySelector(".front .shade");
-        if (shade) shade.style.opacity = String(Math.min(.62, Math.sin(Math.PI * p) * .72));
+        if (shade) shade.style.opacity = String(Math.min(.48, Math.sin(Math.PI * p) * .58));
+
         if (p < 1) requestAnimationFrame(frame);
         else resolve();
       }
@@ -962,22 +968,24 @@
       binderEl.removeAttribute("data-motion");
       binderEl.style.transform = "";
       lid.style.opacity = "0";
+      lid.style.visibility = "hidden";
       lid.style.pointerEvents = "none";
-      lid.style.transform = "rotateY(-178deg)";
+      lid.style.transform = "translateX(-110%)";
       coverMotion = false;
     }).catch((e) => {
       console.error("[METP] binder open failed", e);
       binderEl.style.transform = "";
       binderEl.setAttribute("data-state", "closed");
       binderEl.removeAttribute("data-motion");
-      lid.style.transform = "rotateY(0deg)";
-      coverMotion = false;
+      lid.style.transform = "translateX(0)";
+      lid.style.opacity = "1";
+      lid.style.visibility = "visible";
       lid.style.pointerEvents = "";
+      coverMotion = false;
     });
   }
 
   function forceCoverPaint() {
-    // Force the compositor to acknowledge the lid before the first animation frame.
     lid.style.display = "block";
     lid.style.visibility = "visible";
     void lid.offsetWidth;
@@ -991,47 +999,37 @@
 
     const closedX = closedBinderX();
 
-    // Mirror the opening: the binder settles toward the closed presentation
-    // while the cover folds back over it. The inside remains rendered until
-    // the final frame, so there is no red/blank discontinuity.
     binderEl.setAttribute("data-state", "open");
     binderEl.setAttribute("data-motion", "closing");
     setBinderX(0);
-    lid.style.pointerEvents = "none";
-    lid.style.opacity = "1";
-    lid.style.transformOrigin = "left center";
 
-    if (false && M.reducedMotion()) {
-      lid.style.transform = "rotateY(0deg)";
-      binderEl.style.transform = "";
-      B.opened = false;
-      binderEl.setAttribute("data-state", "closed");
-      binderEl.removeAttribute("data-motion");
-      lid.style.opacity = "1";
-      lid.style.pointerEvents = "";
-      lid.setAttribute("tabindex", "0");
-      coverMotion = false;
-      return;
-    }
+    lid.style.visibility = "visible";
+    lid.style.opacity = "1";
+    lid.style.pointerEvents = "none";
+    lid.style.transformOrigin = "left center";
 
     const duration = OPEN_MS;
     let start = null;
+
     function frame(ts) {
       if (start == null) start = ts;
       const p = M.clamp((ts - start) / duration, 0, 1);
       const e = .5 - .5 * Math.cos(Math.PI * p);
       setBinderX(closedX * e);
       lid.style.transform = coverTransform(p, false);
+
       const shade = lid.querySelector(".front .shade");
-      if (shade) shade.style.opacity = String(Math.min(.62, Math.sin(Math.PI * p) * .72));
+      if (shade) shade.style.opacity = String(Math.min(.48, Math.sin(Math.PI * p) * .58));
+
       if (p < 1) requestAnimationFrame(frame);
       else {
         B.opened = false;
         binderEl.setAttribute("data-state", "closed");
         binderEl.removeAttribute("data-motion");
         binderEl.style.transform = "";
-        lid.style.transform = "rotateY(0deg)";
+        lid.style.transform = "translateX(0)";
         lid.style.opacity = "1";
+        lid.style.visibility = "visible";
         lid.style.pointerEvents = "";
         lid.setAttribute("tabindex", "0");
         coverMotion = false;
