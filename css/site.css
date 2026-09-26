@@ -132,13 +132,39 @@ img{max-width:100%}
   opacity:1;visibility:visible;clip-path:inset(0 0 0 50%);
 }
 .binder[data-state="closed"]:not([data-motion]) + .tabs{opacity:0;visibility:hidden;pointer-events:none}
-.binder[data-mode="dual"][data-motion] + .tabs,
-.binder[data-mode="dual"][data-state="open"]:not([data-motion]) + .tabs{
-  transform:translateX(calc((var(--lw) + var(--ms))/-2 + var(--tabs-gutter)/2));
-}
 .binder[data-motion="opening"] .spread,
 .binder[data-motion="closing"] .spread{
   opacity:1;visibility:visible;clip-path:none;
+}
+.binder[data-motion="opening"] .slot.left .leaf{
+  transform-origin:right center;
+  animation:metp-page-open-left .94s cubic-bezier(.48,0,.52,1) .08s both;
+}
+.binder[data-motion="opening"] .slot.right .leaf{
+  transform-origin:left center;
+  animation:metp-page-open-right .86s cubic-bezier(.48,0,.52,1) both;
+}
+.binder[data-motion="closing"] .slot.left .leaf{
+  transform-origin:right center;
+  animation:metp-page-open-left .94s cubic-bezier(.48,0,.52,1) .08s reverse both;
+}
+.binder[data-motion="closing"] .slot.right .leaf{
+  transform-origin:left center;
+  animation:metp-page-open-right .86s cubic-bezier(.48,0,.52,1) reverse both;
+}
+@keyframes metp-page-open-left{
+  0%{transform:rotateY(20deg) translateZ(12px);box-shadow:0 12px 18px rgba(20,8,3,.20)}
+  35%{transform:rotateY(-12deg) translateZ(18px)}
+  68%{transform:rotateY(6deg) translateZ(9px)}
+  88%{transform:rotateY(-2deg) translateZ(3px)}
+  100%{transform:none;box-shadow:none}
+}
+@keyframes metp-page-open-right{
+  0%{transform:rotateY(-22deg) translateZ(12px);box-shadow:0 14px 20px rgba(20,8,3,.24)}
+  35%{transform:rotateY(14deg) translateZ(18px)}
+  68%{transform:rotateY(-7deg) translateZ(10px)}
+  88%{transform:rotateY(3deg) translateZ(4px)}
+  100%{transform:none;box-shadow:none}
 }
 .binder[data-motion="opening"] .rings,
 .binder[data-motion="closing"] .rings,
