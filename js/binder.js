@@ -330,13 +330,19 @@
   // and shows up as a stutter at the exact moment the turn is most visible.
   function renderSpreadCore() {
     const [a, b] = B.spreads[B.cur] || [null, null];
-    slotL.classList.toggle("empty", !a);
-    slotR.classList.toggle("empty", !b && !B.single);
     slotL.textContent = "";
     slotR.textContent = "";
-    if (a) slotL.appendChild(buildLeafContent(pageMeta(a), "left"));
-    if (b) slotR.appendChild(buildLeafContent(pageMeta(b), "right"));
-    else if (!B.single) slotR.appendChild(buildLeafContent(null, "right"));
+    // "empty" must reflect what actually got appended below, not the raw
+    // a/b pair — a null right page in dual mode still gets a real blank
+    // "leaf-back-paper" sheet appended (so the spread never shows a gap),
+    // so the slot must NOT be marked empty (which is visibility:hidden and
+    // would hide that very sheet again, leaving the desk showing through).
+    let leftFilled = false, rightFilled = false;
+    if (a) { slotL.appendChild(buildLeafContent(pageMeta(a), "left")); leftFilled = true; }
+    if (b) { slotR.appendChild(buildLeafContent(pageMeta(b), "right")); rightFilled = true; }
+    else if (!B.single) { slotR.appendChild(buildLeafContent(null, "right")); rightFilled = true; }
+    slotL.classList.toggle("empty", !leftFilled);
+    slotR.classList.toggle("empty", !rightFilled);
     document.getElementById("prevPage").disabled = B.cur === 0;
     document.getElementById("nextPage").disabled = B.cur === B.spreads.length - 1;
     const peelL = document.getElementById("peelLeft"), peelR = document.getElementById("peelRight");
@@ -449,11 +455,12 @@
   // means the spine is at its right edge (visually "hinge: right center"),
   // 'right' means the spine is at its left edge. The rotation SIGN (which
   // way it swings) is what encodes forward vs backward, via `dir`.
-  function buildLeafFlipper(spreadEl2, hinge, leftPx, w, frontPg, backPg, dir) {
+  function buildLeafFlipper(spreadEl2, hinge, leftPx, w, frontPg, backPg, dir, phase) {
     const flipper = M.el("div", { class: "flipper" });
     flipper.style.width = w + "px";
     flipper.style.left = leftPx + "px";
     flipper.style.transformOrigin = hinge === "right" ? "left center" : "right center";
+    phase = phase || 0;
 
     const side = hinge === "right" ? "right" : "left";
     const front = M.el("div", { class: "face front" }, [buildLeafContent(pageMeta(frontPg), side)]);
@@ -479,15 +486,29 @@
     const frontSheen = front.querySelector(".sheen");
     const backSheen = back.querySelector(".sheen");
 
-    function update(eased) {
+    function update(t) {
+      // `t` is the shared, un-eased master clock (0→1) for the whole turn.
+      // Each leaf runs its OWN eased progress from a slightly offset start
+      // (`phase`), so the two leaves do NOT pass through the edge-on 90°
+      // point at the same instant. Doing it in perfect lockstep is what
+      // made the turn read as a spinning fan/pinwheel: both panels would
+      // collapse to an invisible sliver and pop back out simultaneously.
+      // A small stagger turns that into a believable "one side leads,
+      // the other follows a beat later" page turn, like a real hand lifting
+      // one edge first.
+      const local = M.clamp((t - phase) / (1 - phase), 0, 1);
+      const eased = 1 - Math.pow(1 - local, 3);
       // Both leaves use the SAME signed angle: each rotates in its own
       // local frame (transform-origin pinned at its own spine edge), and
       // since those two origins sit on opposite sides of the spread, the
       // same CSS sign already produces the correct mirrored motion for
       // each side — no extra per-leaf sign flip needed.
       const angle = -180 * dir * eased;
-      flipper.style.transform = "rotateY(" + angle + "deg)";
       const mid = Math.sin(eased * Math.PI); // 0→1→0, peaks mid-flip
+      // A real sheet of paper bows slightly as it turns rather than
+      // staying a perfectly rigid flat plane — a small forward bulge
+      // (translateZ) at the midpoint sells "paper", not "spinning card".
+      flipper.style.transform = "rotateY(" + angle + "deg) translateZ(" + (mid * 16) + "px)";
       frontShade.style.opacity = eased < 0.5 ? M.clamp(eased * 2, 0, 1) : 0;
       backShade.style.opacity = eased > 0.5 ? 1 - (eased - 0.5) * 2 : 0;
       frontSheen.style.opacity = mid * 0.5;
@@ -518,18 +539,22 @@
     if (B.single) {
       leaves.push(buildLeafFlipper(
         spreadEl2, "right", 0, fullW,
-        curSpread.find(Boolean) || null, targetSpread.find(Boolean) || null, dir
+        curSpread.find(Boolean) || null, targetSpread.find(Boolean) || null, dir, 0
       ));
       hiddenSlots.push(slotR);
     } else {
       const w = fullW / 2;
-      leaves.push(buildLeafFlipper(spreadEl2, "left", 0, w, curSpread[0], targetSpread[0], dir));
-      leaves.push(buildLeafFlipper(spreadEl2, "right", w, w, curSpread[1], targetSpread[1], dir));
+      // The leaf nearer the spine on the side the turn is heading TOWARD
+      // leads by a beat; the trailing leaf follows — see the comment in
+      // buildLeafFlipper's update() for why this stagger matters.
+      const rightLeads = dir > 0;
+      leaves.push(buildLeafFlipper(spreadEl2, "left", 0, w, curSpread[0], targetSpread[0], dir, rightLeads ? 0.12 : 0));
+      leaves.push(buildLeafFlipper(spreadEl2, "right", w, w, curSpread[1], targetSpread[1], dir, rightLeads ? 0 : 0.12));
       hiddenSlots.push(slotL, slotR);
     }
     hiddenSlots.forEach((s) => { s.style.visibility = "hidden"; });
 
-    const dur = isJump ? 620 : 680;
+    const dur = isJump ? 680 : 760;
     let start;
     return new Promise((resolve) => {
       let done = false, swapped = false, watchdog;
@@ -556,9 +581,11 @@
         try {
           if (start == null) start = ts;
           const t = M.clamp((ts - start) / dur, 0, 1);
-          const eased = 1 - Math.pow(1 - t, 3);
-          leaves.forEach((L) => L.update(eased));
-          if (eased > 0.5) swap();
+          leaves.forEach((L) => L.update(t));
+          // Swap once the slower (trailing/phase-delayed) leaf has passed
+          // its own halfway point, so the model/DOM never lands before the
+          // visible turn does.
+          if (t > 0.56) swap();
           if (t < 1) requestAnimationFrame(frame);
           else finish();
         } catch (e) {
