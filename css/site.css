@@ -992,3 +992,33 @@ dialog::backdrop{background:rgba(18,8,3,.78);backdrop-filter:blur(2px)}
   visibility:hidden!important;
   pointer-events:none!important;
 }
+
+
+/* Paper lip attached to the hard cover. It never replaces the real page
+   layers; it simply peeks at the cover edge while the cover swings. */
+.lid-paper-edge{
+  position:absolute;
+  z-index:1;
+  right:5px;
+  top:18px;
+  bottom:18px;
+  width:7px;
+  border-radius:1px;
+  background:
+    repeating-linear-gradient(
+      180deg,
+      #fffdf4 0 2px,
+      #d7cfbd 2px 2.7px,
+      #f6f0e3 2.7px 4px
+    );
+  box-shadow:
+    -2px 0 2px rgba(0,0,0,.16),
+    1px 0 2px rgba(255,255,255,.28);
+  opacity:0;
+  pointer-events:none;
+  transform:translateZ(1px);
+}
+.binder[data-motion="opening"] .lid-paper-edge,
+.binder[data-motion="closing"] .lid-paper-edge{
+  opacity:1;
+}
