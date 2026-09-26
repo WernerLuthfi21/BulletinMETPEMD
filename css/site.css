@@ -356,9 +356,7 @@ img{max-width:100%}
 @media (prefers-reduced-motion:reduce){
   .physical-turn{transition:none!important}
 }
-  .physical-turn{transition:none!important}
-}
-
+ 
 /* ---------- 7. rings, sticker, control bar, index tabs ---------- */
 .rings{position:absolute;z-index:6;left:50%;top:var(--mt);height:var(--lh);width:0;pointer-events:none;transition:opacity .4s}
 .binder[data-mode="single"] .rings{left:calc(var(--ms) + 16px)}
