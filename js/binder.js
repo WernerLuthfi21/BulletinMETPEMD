@@ -1032,6 +1032,28 @@
   }
 
   lid.addEventListener("click", openBinder);
+
+  // Closing must never depend on the tiny METP sticker. Keep several physical
+  // interaction targets available while open: the paper close tab and the
+  // exposed red cover margin. This makes the binder behave like an actual
+  // hinged object instead of a one-way animation.
+  const closeHit = document.getElementById("binderCloseHit");
+  if (closeHit) {
+    closeHit.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      closeBinder();
+    });
+  }
+  const rightCover = binderEl.querySelector(".cover.right");
+  if (rightCover) {
+    rightCover.addEventListener("click", (e) => {
+      if (!B.opened || coverMotion) return;
+      // Only the exposed red cover margin is a close affordance. Page content
+      // sits above it, so normal page controls remain untouched.
+      closeBinder();
+    });
+  }
   lid.addEventListener("keydown", (e) => {
     if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openBinder(); }
   });
