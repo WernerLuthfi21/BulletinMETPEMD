@@ -126,29 +126,7 @@ img{max-width:100%}
 .binder[data-state="closed"]:not([data-motion]) .rings,
 .binder[data-state="closed"]:not([data-motion]) .b-bar,
 .binder[data-state="closed"]:not([data-motion]) .sticker,
-.binder[data-state="closed"]:not([data-motion]) .binder-close-hit{
-  position:absolute;z-index:13;right:18px;top:18px;
-  display:flex;align-items:center;gap:8px;
-  min-height:34px;padding:7px 11px 7px 13px;
-  border:1px solid rgba(72,40,25,.18);border-radius:3px;
-  background:linear-gradient(155deg,#f8f0dc,#e6d8ba);
-  color:#3d3027;box-shadow:2px 3px 5px rgba(0,0,0,.25);
-  font:700 11px/1 var(--ui,Arial,sans-serif);letter-spacing:.06em;
-  cursor:pointer;transform:rotate(1.5deg) translateY(-2px);
-  opacity:0;visibility:hidden;pointer-events:none;
-  transition:opacity .35s var(--ease),transform .25s var(--ease),visibility .35s;
-}
-.binder-close-hit b{font-size:18px;line-height:12px;font-weight:500}
-.binder-close-hit:hover{transform:rotate(.5deg) translateY(-3px) scale(1.03)}
-.binder[data-state="open"] .binder-close-hit{
-  opacity:.94;visibility:visible;pointer-events:auto;
-}
-.binder[data-state="closed"] .binder-close-hit{display:none}
-.binder[data-motion="closing"] .binder-close-hit{opacity:0;pointer-events:none}
-@media (max-width:900px){
-  .binder-close-hit{right:12px;top:12px;font-size:10px;padding:6px 9px}
-}
-
+.binder[data-state="closed"]:not([data-motion]) .hint{opacity:0;visibility:hidden}
 .hint{opacity:0;visibility:hidden}
 .binder[data-state="closed"]:not([data-motion]) .spread{
   opacity:1;visibility:visible;clip-path:inset(0 0 0 50%);
@@ -941,77 +919,76 @@ dialog::backdrop{background:rgba(18,8,3,.78);backdrop-filter:blur(2px)}
 
 
 /* ========================================================================
-   BINDER MOTION OVERRIDES — deterministic physical cover interaction
+   BINDER MOTION — single-sided, deterministic cover animation
    ======================================================================== */
 .binder .lid{
-  display:block;
-  visibility:visible;
+  display:block!important;
+  visibility:visible!important;
   opacity:1;
   z-index:30;
-  transform-origin:0% 50%;
+  transform-origin:0 50%;
   transform-style:preserve-3d;
   -webkit-transform-style:preserve-3d;
   backface-visibility:visible;
   -webkit-backface-visibility:visible;
   will-change:transform,opacity;
-  transition:none !important;
+  transition:none!important;
 }
-.binder[data-state="closed"]:not([data-motion]) .lid{
-  opacity:1;
-  visibility:visible;
-  pointer-events:auto;
+.binder .lid-face.front{
+  backface-visibility:visible!important;
+  -webkit-backface-visibility:visible!important;
+}
+.binder .lid-face.back{
+  display:none!important;
 }
 .binder[data-state="open"]:not([data-motion]) .lid{
-  opacity:0;
-  visibility:hidden;
-  pointer-events:none;
+  opacity:0!important;
+  visibility:hidden!important;
+  pointer-events:none!important;
+}
+.binder[data-state="closed"]:not([data-motion]) .lid{
+  opacity:1!important;
+  visibility:visible!important;
+  pointer-events:auto!important;
 }
 .binder[data-motion="opening"] .lid,
 .binder[data-motion="closing"] .lid{
-  opacity:1 !important;
-  visibility:visible !important;
-  pointer-events:none !important;
+  opacity:1!important;
+  visibility:visible!important;
+  pointer-events:none!important;
 }
 .binder-close-hit{
-  position:absolute !important;
-  z-index:40 !important;
-  right:18px !important;
-  top:18px !important;
-  display:flex !important;
-  align-items:center !important;
-  gap:8px !important;
-  min-height:34px;
-  padding:7px 11px 7px 13px;
-  border:1px solid rgba(72,40,25,.18);
-  border-radius:3px;
-  background:linear-gradient(155deg,#f8f0dc,#e6d8ba);
-  color:#3d3027;
-  box-shadow:2px 3px 5px rgba(0,0,0,.25);
-  font:700 11px/1 var(--ui,Arial,sans-serif);
-  letter-spacing:.06em;
-  cursor:pointer;
-  opacity:0;
-  visibility:hidden;
-  pointer-events:none;
+  position:absolute!important;
+  z-index:50!important;
+  right:18px!important;
+  top:18px!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:8px!important;
+  min-height:34px!important;
+  padding:7px 11px 7px 13px!important;
+  border:1px solid rgba(72,40,25,.18)!important;
+  border-radius:3px!important;
+  background:linear-gradient(155deg,#f8f0dc,#e6d8ba)!important;
+  color:#3d3027!important;
+  box-shadow:2px 3px 5px rgba(0,0,0,.25)!important;
+  font:700 11px/1 var(--ui,Arial,sans-serif)!important;
+  letter-spacing:.06em!important;
+  cursor:pointer!important;
+  opacity:0!important;
+  visibility:hidden!important;
+  pointer-events:none!important;
   transform:rotate(1.5deg) translateY(-2px);
 }
 .binder[data-state="open"]:not([data-motion]) .binder-close-hit{
-  opacity:.94 !important;
-  visibility:visible !important;
-  pointer-events:auto !important;
+  opacity:.94!important;
+  visibility:visible!important;
+  pointer-events:auto!important;
 }
-.binder[data-motion="closing"] .binder-close-hit{
-  opacity:0 !important;
-  visibility:hidden !important;
-  pointer-events:none !important;
-}
+.binder[data-motion="opening"] .binder-close-hit,
+.binder[data-motion="closing"] .binder-close-hit,
 .binder[data-state="closed"] .binder-close-hit{
-  opacity:0 !important;
-  visibility:hidden !important;
-  pointer-events:none !important;
-}
-.binder[data-motion="opening"] .binder-close-hit{
-  opacity:0 !important;
-  visibility:hidden !important;
-  pointer-events:none !important;
+  opacity:0!important;
+  visibility:hidden!important;
+  pointer-events:none!important;
 }
