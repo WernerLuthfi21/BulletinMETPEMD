@@ -215,7 +215,15 @@ img{max-width:100%}
 .leaf-ruled{position:absolute;inset:0;
   background:repeating-linear-gradient(transparent 0 calc(var(--lw)*.075 - 1px),rgba(63,111,147,.22) calc(var(--lw)*.075 - 1px) calc(var(--lw)*.075));
   background-position:0 calc(var(--lw)*.12)}
-.leaf-back-paper{position:absolute;inset:0;background:linear-gradient(120deg,rgba(255,255,255,.22),rgba(0,0,0,.06))}
+/* Used as an extra class on .leaf itself (see js/binder.js buildLeafContent),
+   so this must layer ON TOP of .leaf's own cream background, not replace it —
+   a single `background` here previously won the cascade (same specificity,
+   declared later) and wiped the cream out entirely, leaving only this
+   near-transparent gradient with nothing solid behind it: on a leaf with no
+   opaque backdrop of its own, that let the red cover/desk show straight
+   through, which is why a blank "back of the sheet" page looked like an
+   empty gap instead of paper. */
+.leaf-back-paper{position:absolute;inset:0;background:linear-gradient(120deg,rgba(255,255,255,.22),rgba(0,0,0,.06)),#faf5e8}
 
 /* ---------- data-driven page content (the real "book page" — see js/binder.js buildSpreadPage) ----------
    Scaled with the same var(--lw) (binder width) unit as .tbc above, so
