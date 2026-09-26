@@ -343,6 +343,7 @@
     else if (!B.single) { slotR.appendChild(buildLeafContent(null, "right")); rightFilled = true; }
     slotL.classList.toggle("empty", !leftFilled);
     slotR.classList.toggle("empty", !rightFilled);
+    updatePageStackDepths();
     document.getElementById("prevPage").disabled = B.cur === 0;
     document.getElementById("nextPage").disabled = B.cur === B.spreads.length - 1;
     const peelL = document.getElementById("peelLeft"), peelR = document.getElementById("peelRight");
@@ -403,6 +404,27 @@
     return n;
   }
 
+  /* ---------- physical page-stack thickness ----------
+     The visible edge is not a fixed decorative shadow. It represents the
+     number of sheets actually remaining behind each side of the spread.
+     As the reader advances, sheets migrate from the right stack to the left
+     stack exactly like a real binder. */
+  function updatePageStackDepths() {
+    const total = B.pages.filter((p) => p && !p.placeholder).length;
+    const before = flatIndexOfSpread(B.cur);
+    const visible = (B.spreads[B.cur] || []).filter((p) => p && !p.placeholder).length;
+    const after = Math.max(0, total - before - visible);
+
+    // Keep the visual thickness subtle; one sheet is about 0.7px of visible
+    // edge and the whole stack is capped so a large bulletin stays believable.
+    const leftDepth = Math.min(15, before) * 0.72;
+    const rightDepth = Math.min(15, after) * 0.72;
+    slotL.style.setProperty("--stack-depth", leftDepth.toFixed(2) + "px");
+    slotR.style.setProperty("--stack-depth", rightDepth.toFixed(2) + "px");
+    slotL.style.setProperty("--stack-pages", String(Math.min(15, before)));
+    slotR.style.setProperty("--stack-pages", String(Math.min(15, after)));
+  }
+
   /* ---------- page-flip animation: one physical sheet ---------- */
   let flipping = false;
   let navigationBusy = false;
@@ -412,8 +434,8 @@
   // Going backward is the exact mirror: LEFT turns to the RIGHT and its back
   // is the destination RIGHT page. This is the key invariant that prevents
   // the old "two cards spinning at once" artifact.
-  const FLIP_MS = 880;
-  const OPEN_MS = 920;
+  const FLIP_MS = 760;
+  const OPEN_MS = 820;
 
   function leafNode(slot) {
     return slot && slot.firstElementChild ? slot.firstElementChild : null;
@@ -857,6 +879,7 @@
     // frame 0, which made the spread/rings/bar appear underneath a still
     // rotating cover and produced the giant mid-air artifact.
     binderEl.setAttribute("data-state", "closed");
+    binderEl.setAttribute("data-motion", "opening");
     lid.style.opacity = "1";
     lid.style.transformOrigin = "left center";
     lid.style.transform = "rotateY(0deg)";
@@ -884,6 +907,7 @@
       // therefore contains the complete current spread, never a blank sheet.
       B.opened = true;
       binderEl.setAttribute("data-state", "open");
+      binderEl.removeAttribute("data-motion");
       lid.style.opacity = "0";
       lid.style.pointerEvents = "none";
       lid.style.transform = "rotateY(-178deg)";
@@ -905,6 +929,7 @@
     // Switching to closed only after the last frame prevents the contents,
     // rings and bar from disappearing through the cover mid-motion.
     binderEl.setAttribute("data-state", "open");
+    binderEl.setAttribute("data-motion", "closing");
     lid.style.pointerEvents = "none";
     lid.style.opacity = "1";
     lid.style.transformOrigin = "left center";
@@ -913,6 +938,7 @@
       lid.style.transform = "rotateY(0deg)";
       B.opened = false;
       binderEl.setAttribute("data-state", "closed");
+      binderEl.removeAttribute("data-motion");
       lid.style.opacity = "1";
       lid.style.pointerEvents = "";
       lid.setAttribute("tabindex", "0");
@@ -933,6 +959,7 @@
       else {
         B.opened = false;
         binderEl.setAttribute("data-state", "closed");
+        binderEl.removeAttribute("data-motion");
         lid.style.transform = "rotateY(0deg)";
         lid.style.opacity = "1";
         lid.style.pointerEvents = "";
