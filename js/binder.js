@@ -684,8 +684,6 @@
     coverMotion = true;
     lid.setAttribute("tabindex", "-1");
     lid.style.pointerEvents = "none";
-    M.sound && M.sound.open();
-
     // IMPORTANT: remain data-state=closed until the physical cover has
     // completely cleared the pages. The old implementation set "open" on
     // frame 0, which made the spread/rings/bar appear underneath a still
@@ -697,6 +695,7 @@
 
     const ready = currentSpreadReady ? Promise.resolve() : waitForCurrentSpread();
     ready.then(() => new Promise((resolve) => {
+      M.sound && M.sound.open();
       if (M.reducedMotion()) { resolve(); return; }
 
       const duration = OPEN_MS;
