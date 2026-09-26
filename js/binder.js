@@ -956,27 +956,14 @@
   }
 
   function coverTransform(progress, opening) {
-    // Cover-only motion: keep the hinge fixed and rotate the actual hard cover.
-    // Do NOT translate the cover itself across the spread; the previous
-    // translateX was the reason it appeared as a floating rectangular card.
+    // Physical hard-cover motion: one rigid cover, one hinge, two registered
+    // faces. The critical rule is that the artwork front is NEVER shown from
+    // behind; once the sheet crosses 90deg the real inner/back face takes over.
     const p = M.clamp(progress, 0, 1);
     const e = .5 - .5 * Math.cos(Math.PI * p);
-    const s = Math.sin(Math.PI * e);
-
-    const angle = opening ? -179 * e : -179 * (1 - e);
-    const lift = 6 * s;
-    const pitch = (opening ? -1 : 1) * 0.75 * s;
-    const roll = (opening ? -1 : 1) * 0.9 * s;
-
-    return "translateZ(" + lift.toFixed(2) + "px) " +
-      "rotateY(" + angle.toFixed(3) + "deg) " +
-      "rotateX(" + pitch.toFixed(3) + "deg) " +
-      "rotateZ(" + roll.toFixed(3) + "deg)";
-  }
-
-  async function waitForCurrentSpread() {
-    currentSpreadReady = await ensureSpreadReady(B.spreads[B.cur]);
-    return currentSpreadReady;
+    const angle = opening ? -180 * e : -180 * (1 - e);
+    const lift = Math.sin(Math.PI * e) * 4;
+    return "translateZ(" + lift.toFixed(2) + "px) rotateY(" + angle.toFixed(3) + "deg)";
   }
 
   function paintPaperMotion(progress) {
