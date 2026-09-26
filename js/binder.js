@@ -684,7 +684,6 @@
       navigationBusy = false;
       active = false;
       pending = false;
-      if (cancelOnly) updateTurnProgress = updateTurnProgress;
     }
 
     async function beginSheet() {
@@ -748,7 +747,7 @@
       return true;
     }
 
-    function animateRelease(targetProgress, dir, commit) {
+    function animateRelease(targetProgress, dir, commit, after) {
       const from = progress;
       const duration = Math.max(140, Math.round(260 + Math.abs(targetProgress - from) * 360));
       let start = null;
@@ -770,6 +769,7 @@
           cleanup(!commit);
           renderMeta();
           renderTabs();
+          if (after) after();
         }
       }
       requestAnimationFrame(frame);
@@ -815,7 +815,10 @@
         return;
       }
       const commit = progress > .35;
-      animateRelease(commit ? 1 : 0, forward ? 1 : -1, commit);
+      const shouldClick = !moved;
+      animateRelease(commit ? 1 : 0, forward ? 1 : -1, commit, shouldClick
+        ? () => goToSpread(B.cur + (forward ? 1 : -1))
+        : null);
       try { el.releasePointerCapture(pointerId); } catch (err) {}
       pointerId = null;
     }
