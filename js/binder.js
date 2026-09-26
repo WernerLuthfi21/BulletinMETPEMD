@@ -434,8 +434,8 @@
   // Going backward is the exact mirror: LEFT turns to the RIGHT and its back
   // is the destination RIGHT page. This is the key invariant that prevents
   // the old "two cards spinning at once" artifact.
-  const FLIP_MS = 760;
-  const OPEN_MS = 820;
+  const FLIP_MS = 900;
+  const OPEN_MS = 1040;
 
   function leafNode(slot) {
     return slot && slot.firstElementChild ? slot.firstElementChild : null;
@@ -443,14 +443,16 @@
 
   async function ensureSpreadReady(spread) {
     const pages = (spread || []).filter(Boolean);
-    // Never start a physical turn while its destination is still a spinner.
-    // Data-driven HTML spreads resolve immediately; image/PDF pages are warmed
-    // through the existing preview cache.
+    // A turn/open is allowed to start only when every destination asset that
+    // can be preloaded has actually resolved. This prevents a white/loading
+    // leaf from appearing exactly when the cover or page reaches its most
+    // visible angle.
     try {
       await Promise.all(pages.map((p) => preloadPage(p)));
+      return true;
     } catch (e) {
-      // A failed page is allowed to render its retry state; the animation
-      // itself must remain usable.
+      console.warn("[METP] spread warm-up incomplete; rendering retry state", e);
+      return false;
     }
   }
 
@@ -485,9 +487,7 @@
     // Reference model: a real sheet rotates around its bound edge. Do not
     // skew the entire card while it turns; the skew was the source of the
     // "giant rigid card" look. The front/back faces stay registered in 3D.
-    const e = p < .5
-      ? 16 * Math.pow(p, 5)
-      : 1 - Math.pow(-2 * p + 2, 5) / 2;
+    const e = .5 - .5 * Math.cos(Math.PI * p);
     const angle = (dir > 0 ? -180 : 180) * e;
     const curl = Math.sin(Math.PI * e);
 
@@ -879,9 +879,36 @@
   let coverMotion = false;
   let currentSpreadReady = false;
 
+  function closedBinderX() {
+    if (B.single) return 0;
+    const cs = getComputedStyle(binderEl);
+    const lw = parseFloat(cs.getPropertyValue("--lw")) || 0;
+    const ms = parseFloat(cs.getPropertyValue("--ms")) || 0;
+    const tabsGutter = parseFloat(cs.getPropertyValue("--tabs-gutter")) || 0;
+    return -((lw + ms) / 2) + tabsGutter / 2;
+  }
+
+  function setBinderX(x) {
+    binderEl.style.transform = "translate3d(" + x.toFixed(2) + "px,0,0) rotate(-.35deg)";
+  }
+
+  function coverTransform(progress, opening) {
+    // A real cover has momentum: it starts gently, moves through the middle
+    // with weight, then settles into the flat position. The old cubic path
+    // exposed the cover as a rigid card and, worse, the parent binder jumped
+    // sideways at the end. Keep the hinge point fixed while the whole binder
+    // transitions from its closed presentation to its open presentation.
+    const e = .5 - .5 * Math.cos(Math.PI * M.clamp(progress, 0, 1));
+    const settle = Math.sin(Math.PI * e);
+    const angle = (opening ? -178 : 0) + (opening ? -1 : 1) * 1.8 * settle;
+    const lift = settle * 5.5;
+    const pitch = (opening ? -1 : 1) * settle * 0.55;
+    return "translateZ(" + lift.toFixed(2) + "px) rotateY(" + angle.toFixed(3) + "deg) rotateX(" + pitch.toFixed(3) + "deg)";
+  }
+
   async function waitForCurrentSpread() {
-    await ensureSpreadReady(B.spreads[B.cur]);
-    currentSpreadReady = true;
+    currentSpreadReady = await ensureSpreadReady(B.spreads[B.cur]);
+    return currentSpreadReady;
   }
 
   function openBinder() {
@@ -889,46 +916,57 @@
     coverMotion = true;
     lid.setAttribute("tabindex", "-1");
     lid.style.pointerEvents = "none";
-    // IMPORTANT: remain data-state=closed until the physical cover has
-    // completely cleared the pages. The old implementation set "open" on
-    // frame 0, which made the spread/rings/bar appear underneath a still
-    // rotating cover and produced the giant mid-air artifact.
+
+    const closedX = closedBinderX();
+
+    // Keep the CLOSED geometry for frame 0. The parent then glides toward its
+    // open position at the same time the cover swings around the spine. This
+    // removes the visible "teleport" that previously made the cover appear
+    // as a huge detached card.
     binderEl.setAttribute("data-state", "closed");
     binderEl.setAttribute("data-motion", "opening");
+    setBinderX(closedX);
     lid.style.opacity = "1";
     lid.style.transformOrigin = "left center";
-    lid.style.transform = "rotateY(0deg)";
+    lid.style.transform = coverTransform(0, true);
 
-    const ready = currentSpreadReady ? Promise.resolve() : waitForCurrentSpread();
-    ready.then(() => new Promise((resolve) => {
+    const ready = currentSpreadReady ? Promise.resolve(true) : waitForCurrentSpread();
+    ready.then((ok) => new Promise((resolve) => {
+      // If the current page failed to warm, still open — but do it with the
+      // retry state already present instead of exposing a blank frame.
+      if (!ok) renderSpreadCore();
       M.sound && M.sound.open();
       if (M.reducedMotion()) { resolve(); return; }
 
       const duration = OPEN_MS;
+      const startX = closedX;
       let start = null;
       function frame(ts) {
         if (start == null) start = ts;
         const p = M.clamp((ts - start) / duration, 0, 1);
-        const e = 1 - Math.pow(1 - p, 3);
-        lid.style.transform = "rotateY(" + (-178 * e) + "deg)";
+        const e = .5 - .5 * Math.cos(Math.PI * p);
+        setBinderX(startX * (1 - e));
+        lid.style.transform = coverTransform(p, true);
         const shade = lid.querySelector(".front .shade");
-        if (shade) shade.style.opacity = String(Math.min(.82, e * 1.25) * (1 - e));
+        if (shade) shade.style.opacity = String(Math.min(.62, Math.sin(Math.PI * p) * .72));
         if (p < 1) requestAnimationFrame(frame);
         else resolve();
       }
       requestAnimationFrame(frame);
     })).then(() => {
-      // Only now does the inside become visible. The first painted open frame
-      // therefore contains the complete current spread, never a blank sheet.
       B.opened = true;
       binderEl.setAttribute("data-state", "open");
       binderEl.removeAttribute("data-motion");
+      binderEl.style.transform = "";
       lid.style.opacity = "0";
       lid.style.pointerEvents = "none";
       lid.style.transform = "rotateY(-178deg)";
       coverMotion = false;
     }).catch((e) => {
       console.error("[METP] binder open failed", e);
+      binderEl.style.transform = "";
+      binderEl.setAttribute("data-state", "closed");
+      binderEl.removeAttribute("data-motion");
       lid.style.transform = "rotateY(0deg)";
       coverMotion = false;
       lid.style.pointerEvents = "";
@@ -940,17 +978,21 @@
     coverMotion = true;
     M.sound && M.sound.close();
 
-    // Keep the inside in the OPEN state while the cover is travelling back.
-    // Switching to closed only after the last frame prevents the contents,
-    // rings and bar from disappearing through the cover mid-motion.
+    const closedX = closedBinderX();
+
+    // Mirror the opening: the binder settles toward the closed presentation
+    // while the cover folds back over it. The inside remains rendered until
+    // the final frame, so there is no red/blank discontinuity.
     binderEl.setAttribute("data-state", "open");
     binderEl.setAttribute("data-motion", "closing");
+    setBinderX(0);
     lid.style.pointerEvents = "none";
     lid.style.opacity = "1";
     lid.style.transformOrigin = "left center";
 
     if (M.reducedMotion()) {
       lid.style.transform = "rotateY(0deg)";
+      binderEl.style.transform = "";
       B.opened = false;
       binderEl.setAttribute("data-state", "closed");
       binderEl.removeAttribute("data-motion");
@@ -966,15 +1008,17 @@
     function frame(ts) {
       if (start == null) start = ts;
       const p = M.clamp((ts - start) / duration, 0, 1);
-      const e = p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
-      lid.style.transform = "rotateY(" + (-178 + 178 * e) + "deg)";
+      const e = .5 - .5 * Math.cos(Math.PI * p);
+      setBinderX(closedX * e);
+      lid.style.transform = coverTransform(p, false);
       const shade = lid.querySelector(".front .shade");
-      if (shade) shade.style.opacity = String(Math.min(.82, (1 - e) * 1.25) * e);
+      if (shade) shade.style.opacity = String(Math.min(.62, Math.sin(Math.PI * p) * .72));
       if (p < 1) requestAnimationFrame(frame);
       else {
         B.opened = false;
         binderEl.setAttribute("data-state", "closed");
         binderEl.removeAttribute("data-motion");
+        binderEl.style.transform = "";
         lid.style.transform = "rotateY(0deg)";
         lid.style.opacity = "1";
         lid.style.pointerEvents = "";
