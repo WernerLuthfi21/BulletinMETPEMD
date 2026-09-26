@@ -300,6 +300,41 @@
     });
   }
 
+  async function hydrateLeafImage(leaf, meta) {
+    if (!leaf || !meta || meta.placeholder || (meta.issue && meta.issue.spread)) return leaf;
+    const pg = await preloadPage(meta);
+    if (!pg) return leaf;
+
+    // The visible leaf may still contain the loading marker even though the
+    // image has already been preloaded. Replace that marker NOW, before a
+    // physical turn starts, so the photograph is literally part of the sheet
+    // from frame 0 instead of appearing underneath it mid-flip.
+    if (!leaf.querySelector(".leaf-img")) {
+      const status = leaf.querySelector(".leaf-status");
+      const openBtn = leaf.querySelector(".leaf-open");
+      const img = M.el("img", {
+        class: "leaf-img",
+        src: pg.src,
+        alt: pg.alt || "",
+        loading: "eager",
+        decoding: "async"
+      });
+      leaf.insertBefore(img, status || null);
+      if (status) status.remove();
+      if (openBtn && !openBtn.dataset.bound) {
+        openBtn.dataset.bound = "1";
+        openBtn.addEventListener("click", () => window.METP.reader.open(meta.issue, meta.pageIndex));
+        openBtn.setAttribute("aria-label", "Open " + meta.issue.label + ", page " + (meta.pageIndex + 1) + " in the reader");
+      }
+    }
+    return leaf;
+  }
+
+  async function buildReadyLeafContent(meta, side) {
+    const leaf = buildLeafContent(meta, side);
+    return hydrateLeafImage(leaf, meta);
+  }
+
   function buildPlaceholder(meta) {
     const wrap = M.el("div", { class: "tbc" });
     wrap.appendChild(M.el("div", { class: "grid", "aria-hidden": "true" }));
@@ -468,7 +503,7 @@
 
     const front = M.el("div", { class: "physical-turn-face front" });
     const back = M.el("div", { class: "physical-turn-face back" });
-    front.appendChild(sourceNode.cloneNode(true));
+    if (sourceNode) front.appendChild(sourceNode);
     back.appendChild(backNode ? backNode.cloneNode(true) : buildLeafContent(null, isForward ? "left" : "right"));
 
     const frontShade = M.el("div", { class: "physical-turn-shade" });
@@ -538,7 +573,7 @@
     return under;
   }
 
-  function animatePhysicalTurn(dir, target, viaTab) {
+  async function animatePhysicalTurn(dir, target, viaTab) {
     const destination = B.spreads[target] || [];
     const rect = spreadEl.getBoundingClientRect();
     const half = B.single ? rect.width : rect.width / 2;
@@ -546,10 +581,16 @@
     if (B.single) {
       const source = leafNode(slotR);
       if (!source) return Promise.resolve();
+      const sourcePage = destination.length ? (B.spreads[B.cur] || [null, null])[1] : null;
+      await hydrateLeafImage(source, pageMeta(sourcePage));
       const destPage = destination.find(Boolean) || null;
-      const back = destPage ? buildLeafContent(pageMeta(destPage), "right") : buildLeafContent(null, "right");
+      const back = destPage
+        ? await buildReadyLeafContent(pageMeta(destPage), "right")
+        : await buildReadyLeafContent(null, "right");
       const under = makeTurnUnderlay(
-        destPage ? buildLeafContent(pageMeta(destPage), "right") : buildLeafContent(null, "right"),
+        destPage
+          ? await buildReadyLeafContent(pageMeta(destPage), "right")
+          : await buildReadyLeafContent(null, "right"),
         0, rect.width
       );
       const sheet = makeTurnSheet(source, back, dir);
@@ -571,15 +612,17 @@
       const source = leafNode(slotR);
       if (!source) return Promise.resolve();
 
+      const currentSpread = B.spreads[B.cur] || [null, null];
+      await hydrateLeafImage(source, pageMeta(currentSpread[1]));
       const destinationLeft = destination[0] || null;
       const destinationRight = destination[1] || null;
       const back = destinationLeft
-        ? buildLeafContent(pageMeta(destinationLeft), "left")
-        : buildLeafContent(null, "left");
+        ? await buildReadyLeafContent(pageMeta(destinationLeft), "left")
+        : await buildReadyLeafContent(null, "left");
       const under = makeTurnUnderlay(
         destinationRight
-          ? buildLeafContent(pageMeta(destinationRight), "right")
-          : buildLeafContent(null, "right"),
+          ? await buildReadyLeafContent(pageMeta(destinationRight), "right")
+          : await buildReadyLeafContent(null, "right"),
         half, half
       );
       const sheet = makeTurnSheet(source, back, dir);
@@ -600,15 +643,17 @@
     const source = leafNode(slotL);
     if (!source) return Promise.resolve();
 
+    const currentSpread = B.spreads[B.cur] || [null, null];
+    await hydrateLeafImage(source, pageMeta(currentSpread[0]));
     const destinationLeft = destination[0] || null;
     const destinationRight = destination[1] || null;
     const back = destinationRight
-      ? buildLeafContent(pageMeta(destinationRight), "right")
-      : buildLeafContent(null, "right");
+      ? await buildReadyLeafContent(pageMeta(destinationRight), "right")
+      : await buildReadyLeafContent(null, "right");
     const under = makeTurnUnderlay(
       destinationLeft
-        ? buildLeafContent(pageMeta(destinationLeft), "left")
-        : buildLeafContent(null, "left"),
+        ? await buildReadyLeafContent(pageMeta(destinationLeft), "left")
+        : await buildReadyLeafContent(null, "left"),
       0, half
     );
     const sheet = makeTurnSheet(source, back, dir);
@@ -741,9 +786,15 @@
         const source = leafNode(slotR);
         if (!source) { navigationBusy = false; return false; }
         const dest = destination.find(Boolean) || null;
-        const back = dest ? buildLeafContent(pageMeta(dest), "right") : buildLeafContent(null, "right");
+        const currentSpread = B.spreads[B.cur] || [null, null];
+        await hydrateLeafImage(source, pageMeta(currentSpread[1]));
+        const back = dest
+          ? await buildReadyLeafContent(pageMeta(dest), "right")
+          : await buildReadyLeafContent(null, "right");
         underlay = makeTurnUnderlay(
-          dest ? buildLeafContent(pageMeta(dest), "right") : buildLeafContent(null, "right"),
+          dest
+            ? await buildReadyLeafContent(pageMeta(dest), "right")
+            : await buildReadyLeafContent(null, "right"),
           0, rect.width
         );
         sheet = makeTurnSheet(source, back, forward ? 1 : -1);
@@ -751,13 +802,15 @@
       } else if (forward) {
         const source = leafNode(slotR);
         if (!source) { navigationBusy = false; return false; }
+        const currentSpread = B.spreads[B.cur] || [null, null];
+        await hydrateLeafImage(source, pageMeta(currentSpread[1]));
         const back = destination[0]
-          ? buildLeafContent(pageMeta(destination[0]), "left")
-          : buildLeafContent(null, "left");
+          ? await buildReadyLeafContent(pageMeta(destination[0]), "left")
+          : await buildReadyLeafContent(null, "left");
         underlay = makeTurnUnderlay(
           destination[1]
-            ? buildLeafContent(pageMeta(destination[1]), "right")
-            : buildLeafContent(null, "right"),
+            ? await buildReadyLeafContent(pageMeta(destination[1]), "right")
+            : await buildReadyLeafContent(null, "right"),
           half, half
         );
         sheet = makeTurnSheet(source, back, 1);
@@ -765,13 +818,15 @@
       } else {
         const source = leafNode(slotL);
         if (!source) { navigationBusy = false; return false; }
+        const currentSpread = B.spreads[B.cur] || [null, null];
+        await hydrateLeafImage(source, pageMeta(currentSpread[0]));
         const back = destination[1]
-          ? buildLeafContent(pageMeta(destination[1]), "right")
-          : buildLeafContent(null, "right");
+          ? await buildReadyLeafContent(pageMeta(destination[1]), "right")
+          : await buildReadyLeafContent(null, "right");
         underlay = makeTurnUnderlay(
           destination[0]
-            ? buildLeafContent(pageMeta(destination[0]), "left")
-            : buildLeafContent(null, "left"),
+            ? await buildReadyLeafContent(pageMeta(destination[0]), "left")
+            : await buildReadyLeafContent(null, "left"),
           0, half
         );
         sheet = makeTurnSheet(source, back, -1);
