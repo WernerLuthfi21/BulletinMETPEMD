@@ -53,11 +53,18 @@
       filePath: raw.file_path || null,    // storage path (live mode)
       staticPages: Array.isArray(raw.pages) && raw.pages.length ? raw.pages : (Array.isArray(raw.static_pages) && raw.static_pages.length ? raw.static_pages : null),
       pageCount: raw.page_count || (raw.pages && raw.pages.length) || (raw.static_pages && raw.static_pages.length) || 0,
+      // Data-driven spread: { left:{enabled,blocks}, right:{enabled,blocks} }.
+      // When present this is what actually renders (see js/binder.js) — the
+      // issue always occupies exactly one physical spread (pageIndex 0 =
+      // left, 1 = right), even when one side is disabled/blank, so it can
+      // never bleed into an adjacent month's spread.
+      spread: raw.spread || null,
       highlights: raw.highlights || null,
       events: raw.events || [],
       _pv: {}, _pp: {}, _preview: {}, _previewP: {}
     };
-    if (issue.staticPages && !raw.page_count) issue.pageCount = issue.staticPages.length;
+    if (issue.spread) issue.pageCount = 2;
+    else if (issue.staticPages && !raw.page_count) issue.pageCount = issue.staticPages.length;
     else if (issue.fileType === "png" || issue.fileType === "jpg" || issue.fileType === "jpeg") issue.pageCount = 1;
 
     issue.getUrl = () => ensureUrl(issue);
