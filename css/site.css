@@ -120,10 +120,27 @@ img{max-width:100%}
     -1px 1px 0 #4a0912,-2px 2px 0 #460811,-3px 3px 0 #42070f,-4px 4px 0 #3d070e,
     -5px 5px 0 #38060d,-6px 6px 0 #33060c,-7px 7px 0 #2f050b,-8px 9px 0 #2a050a}
 .cover.right{right:0;border-radius:3px 9px 9px 3px}
-.binder[data-state="closed"] .cover.left,.binder[data-state="closed"] .rings,
-.binder[data-state="closed"] .b-bar,.binder[data-state="closed"] .sticker,
-.binder[data-state="closed"] .spread,.binder[data-state="closed"] .hint{opacity:0;visibility:hidden}
-.binder[data-state="closed"] + .tabs{opacity:0;visibility:hidden;pointer-events:none}
+.binder[data-state="closed"]:not([data-motion]) .cover.left,
+.binder[data-state="closed"]:not([data-motion]) .rings,
+.binder[data-state="closed"]:not([data-motion]) .b-bar,
+.binder[data-state="closed"]:not([data-motion]) .sticker,
+.binder[data-state="closed"]:not([data-motion]) .hint{opacity:0;visibility:hidden}
+.binder[data-state="closed"]:not([data-motion]) .spread{
+  opacity:1;visibility:visible;clip-path:inset(0 0 0 50%);
+}
+.binder[data-state="closed"]:not([data-motion]) + .tabs{opacity:0;visibility:hidden;pointer-events:none}
+.binder[data-motion="opening"] .spread,
+.binder[data-motion="closing"] .spread{
+  opacity:1;visibility:visible;clip-path:none;
+}
+.binder[data-motion="opening"] .rings,
+.binder[data-motion="closing"] .rings,
+.binder[data-motion="opening"] .b-bar,
+.binder[data-motion="closing"] .b-bar,
+.binder[data-motion="opening"] .sticker,
+.binder[data-motion="closing"] .sticker{
+  opacity:1;visibility:visible;
+}
 .binder[data-mode="single"] .cover.left{display:none}
 .binder[data-mode="single"] .cover.right{left:0;right:0;width:auto;border-radius:3px 9px 9px 3px}
 /* gutter (spine recess) */
@@ -143,9 +160,49 @@ img{max-width:100%}
 .binder[data-mode="single"] .spread{width:var(--lw);left:calc(var(--ms) + 16px)}
 .binder[data-mode="single"]{width:calc(var(--lw) + var(--ms)*2 + 16px)}
 
-.slot{position:absolute;top:0;width:var(--lw);height:var(--lh)}
-.slot.left{left:0;box-shadow:-1px 1px 0 #ebe5d6,-2px 2px 0 #c9c2b0,-3px 3px 0 #efe9dc,-4px 4px 0 #bdb6a3,-5px 5px 0 #e8e2d3,-6px 6px 0 #a9a290,-6px 8px 6px rgba(20,8,3,.4)}
-.slot.right{left:var(--lw);box-shadow:1px 1px 0 #ebe5d6,2px 2px 0 #c9c2b0,3px 3px 0 #efe9dc,4px 4px 0 #bdb6a3,5px 5px 0 #e8e2d3,6px 6px 0 #a9a290,8px 10px 8px rgba(20,8,3,.45)}
+.slot{
+  position:absolute;top:0;width:var(--lw);height:var(--lh);
+  --stack-depth:0px;--stack-pages:0;
+  box-shadow:0 8px 9px rgba(20,8,3,.32);
+}
+.slot::before{
+  content:"";position:absolute;top:2px;bottom:2px;width:var(--stack-depth);
+  pointer-events:none;z-index:-1;
+  opacity:calc(.18 + (var(--stack-pages) * .035));
+  background:
+    repeating-linear-gradient(
+      90deg,
+      #faf5e8 0 1px,
+      #c8bfad 1px 1.65px,
+      #f4eddf 1.65px 2.35px,
+      #b8af9e 2.35px 3px
+    );
+  box-shadow:0 3px 5px rgba(20,8,3,.28);
+}
+.slot.left{
+  left:0;
+}
+.slot.left::before{
+  right:100%;
+  transform-origin:right center;
+  transform:skewY(-.35deg);
+  background:
+    repeating-linear-gradient(
+      90deg,
+      #b8af9e 0 1px,
+      #f4eddf 1px 1.7px,
+      #c8bfad 1.7px 2.35px,
+      #faf5e8 2.35px 3px
+    );
+}
+.slot.right{
+  left:var(--lw);
+}
+.slot.right::before{
+  left:100%;
+  transform-origin:left center;
+  transform:skewY(.35deg);
+}
 .binder[data-mode="single"] .slot.right{left:0}
 .binder[data-mode="single"] .slot.left{display:none}
 .slot.empty{visibility:hidden;box-shadow:none}
@@ -468,11 +525,20 @@ button.key svg,a.key svg{width:17px;height:17px;flex:none}
 
 /* outside front cover (closed state + opening animation) */
 .lid{
-  position:absolute;z-index:14;right:0;top:0;bottom:0;width:50%;transform-origin:0 50%;transform-style:preserve-3d;
-  transform:rotateY(0);cursor:pointer;
+  position:absolute;z-index:14;right:0;top:0;bottom:0;width:50%;
+  transform-origin:0 50%;
+  transform-style:preserve-3d;-webkit-transform-style:preserve-3d;
+  backface-visibility:visible;-webkit-backface-visibility:visible;
+  transform:rotateY(0) translateZ(0);
+  cursor:pointer;will-change:transform;
 }
 .binder[data-mode="single"] .lid{width:100%}
-.lid-face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:3px 9px 9px 3px;overflow:hidden}
+.lid-face{
+  position:absolute;inset:0;
+  backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  transform-style:preserve-3d;-webkit-transform-style:preserve-3d;
+  border-radius:3px 9px 9px 3px;overflow:hidden;
+}
 .lid-face.front{
   background:
     radial-gradient(ellipse at 22% 12%,rgba(255,215,210,.35),transparent 55%),
