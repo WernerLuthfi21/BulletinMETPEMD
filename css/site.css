@@ -132,6 +132,10 @@ img{max-width:100%}
   opacity:1;visibility:visible;clip-path:inset(0 0 0 50%);
 }
 .binder[data-state="closed"]:not([data-motion]) + .tabs{opacity:0;visibility:hidden;pointer-events:none}
+.binder[data-mode="dual"][data-motion] + .tabs,
+.binder[data-mode="dual"][data-state="open"]:not([data-motion]) + .tabs{
+  transform:translateX(calc((var(--lw) + var(--ms))/-2 + var(--tabs-gutter)/2));
+}
 .binder[data-motion="opening"] .spread,
 .binder[data-motion="closing"] .spread{
   opacity:1;visibility:visible;clip-path:none;
@@ -347,19 +351,6 @@ img{max-width:100%}
 .peel:active{cursor:grabbing}
 .peel[disabled]{display:none}
 
-/* ---------- 6. page-flip layers ---------- */
-.flipper{position:absolute;top:0;height:var(--lh);width:var(--lw);z-index:8;transform-style:preserve-3d;pointer-events:none;will-change:transform}
-.seg{position:absolute;top:0;height:100%;transform-style:preserve-3d;will-change:transform}
-.face{position:absolute;inset:0;overflow:hidden;backface-visibility:hidden;-webkit-backface-visibility:hidden;background:var(--paper)}
-.face.back{transform:rotateY(180deg)}
-.face .leaf{width:var(--lw);height:100%;inset:auto;top:0}
-.face .shade{position:absolute;inset:0;background:#170a04;opacity:0;pointer-events:none;z-index:6}
-.face .sheen{position:absolute;inset:0;pointer-events:none;z-index:6;mix-blend-mode:soft-light;opacity:0;
-  background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.9) 50%,transparent 70%)}
-.cast{position:absolute;top:0;height:100%;z-index:7;pointer-events:none;opacity:0}
-.cast.r{background:linear-gradient(to right,rgba(15,6,2,.55),rgba(15,6,2,.22) 40%,transparent)}
-.cast.l{background:linear-gradient(to left,rgba(15,6,2,.5),rgba(15,6,2,.2) 40%,transparent)}
-
 .hint{
   position:absolute;left:50%;bottom:calc(var(--mb) + 10px);transform:translate(-50%,6px);z-index:12;
   font:600 12px var(--ui);padding:6px 12px;border-radius:3px;background:#f6f1e5;color:var(--ink);
@@ -561,6 +552,7 @@ button.key svg,a.key svg{width:17px;height:17px;flex:none}
   border-radius:3px 9px 9px 3px;overflow:hidden;
 }
 .lid-face.front{
+  transform:translateZ(.7px);
   background:
     radial-gradient(ellipse at 22% 12%,rgba(255,215,210,.35),transparent 55%),
     url(../assets/textures/cover-grain.webp) 0 0/230px auto,
@@ -569,7 +561,7 @@ button.key svg,a.key svg{width:17px;height:17px;flex:none}
   box-shadow:inset 2px 2px 0 rgba(255,200,200,.32),inset -2px -2px 0 rgba(0,0,0,.35);
 }
 .lid-face.back{
-  transform:rotateY(180deg);border-radius:9px 3px 3px 9px;
+  transform:rotateY(180deg) translateZ(.7px);border-radius:9px 3px 3px 9px;
   background:url(../assets/textures/cover-grain.webp) 0 0/230px auto,linear-gradient(135deg,var(--red-600),var(--red-800) 70%,var(--red-900));
   background-blend-mode:soft-light,normal;
 }
@@ -918,45 +910,8 @@ dialog::backdrop{background:rgba(18,8,3,.78);backdrop-filter:blur(2px)}
 }
 
 
-/* ========================================================================
-   BINDER MOTION — single-sided, deterministic cover animation
-   ======================================================================== */
-.binder .lid{
-  display:block!important;
-  visibility:visible!important;
-  opacity:1;
-  z-index:30;
-  transform-origin:0 50%;
-  transform-style:preserve-3d;
-  -webkit-transform-style:preserve-3d;
-  backface-visibility:visible;
-  -webkit-backface-visibility:visible;
-  will-change:transform,opacity;
-  transition:none!important;
-}
-.binder .lid-face.front{
-  backface-visibility:visible!important;
-  -webkit-backface-visibility:visible!important;
-}
-.binder .lid-face.back{
-  display:none!important;
-}
-.binder[data-state="open"]:not([data-motion]) .lid{
-  opacity:0!important;
-  visibility:hidden!important;
-  pointer-events:none!important;
-}
-.binder[data-state="closed"]:not([data-motion]) .lid{
-  opacity:1!important;
-  visibility:visible!important;
-  pointer-events:auto!important;
-}
-.binder[data-motion="opening"] .lid,
-.binder[data-motion="closing"] .lid{
-  opacity:1!important;
-  visibility:visible!important;
-  pointer-events:none!important;
-}
+/* Cover motion state is owned by js/binder.js; CSS only supplies the physical
+   surfaces and visibility for the settled states. */
 .binder-close-hit{
   position:absolute!important;
   z-index:50!important;
@@ -1018,29 +973,25 @@ dialog::backdrop{background:rgba(18,8,3,.78);backdrop-filter:blur(2px)}
   pointer-events:none;
   transform:translateZ(1px);
 }
-.binder[data-motion="opening"] .lid-paper-edge,
-.binder[data-motion="closing"] .lid-paper-edge{
-  opacity:1;
-}
 
-/* ========================================================================
-   BINDER COVER FINAL — one hinge, one cover, no mirrored artwork
-   ======================================================================== */
+/* One physical cover leaf, with distinct front and reverse faces. */
 .binder .lid{
+  display:block!important;
+  z-index:30;
   transform-origin:0 50%;
   transform-style:preserve-3d;
   -webkit-transform-style:preserve-3d;
   backface-visibility:visible;
   -webkit-backface-visibility:visible;
   transition:none!important;
-  will-change:transform;
+  will-change:transform,opacity;
 }
 .binder .lid-face.front{
   backface-visibility:hidden!important;
   -webkit-backface-visibility:hidden!important;
 }
 .binder .lid-face.back{
-  display:none!important;
+  display:block!important;
 }
 .binder[data-motion="opening"] .lid,
 .binder[data-motion="closing"] .lid{

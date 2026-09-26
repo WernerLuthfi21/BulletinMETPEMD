@@ -42,7 +42,9 @@
   // by a stale/blank loading state during the flip. This is especially
   // important on mobile where image decode can otherwise take several frames.
   const pageCache = new Map();
+  const pageResultCache = new Map();
   const imageCache = new Map();
+  let assetRevision = 0;
 
   function pageKey(meta) {
     if (!meta || meta.placeholder) return null;
@@ -55,28 +57,51 @@
     if (meta.issue.spread) return Promise.resolve(null); // block-based page: nothing to fetch/decode
     if (pageCache.has(key)) return pageCache.get(key);
     const promise = meta.issue.getPage(meta.pageIndex, { preview: true }).then((pg) => {
-      const src = pg.src;
-      if (!imageCache.has(src)) {
-        imageCache.set(src, M.withTimeout(new Promise((resolve, reject) => {
-          const img = new Image();
-          img.decoding = "async";
-          img.onload = () => resolve(img);
-          img.onerror = () => reject(new Error("Image failed to preload: " + src));
-          img.src = src;
-          if (img.complete && img.naturalWidth > 0) {
-            Promise.resolve(img.decode ? img.decode() : null).finally(() => resolve(img));
-          }
-        }), 20000, "preloading image").catch((e) => { imageCache.delete(src); throw e; }));
-      }
-      return imageCache.get(src).then(() => pg);
+      return preloadImage(pg.src).then(() => pg);
     });
-    pageCache.set(key, promise);
-    promise.catch(() => pageCache.delete(key));
-    return promise;
+    const revision = assetRevision;
+    const cachedPromise = promise.then((pg) => {
+      if (revision === assetRevision) pageResultCache.set(key, pg);
+      return pg;
+    });
+    pageCache.set(key, cachedPromise);
+    cachedPromise.catch(() => {
+      if (pageCache.get(key) === cachedPromise) pageCache.delete(key);
+    });
+    return cachedPromise;
   }
 
   function warmSpread(spread) {
     return Promise.all((spread || []).map((pg) => preloadPage(pg)));
+  }
+
+  function preloadImage(src) {
+    if (!imageCache.has(src)) {
+      imageCache.set(src, M.withTimeout(new Promise((resolve, reject) => {
+        const img = new Image();
+        img.decoding = "async";
+        img.onload = async () => {
+          try {
+            if (img.decode) await img.decode();
+            resolve(img);
+          } catch (error) {
+            reject(error);
+          }
+        };
+        img.onerror = () => reject(new Error("Image failed to preload: " + src));
+        img.src = src;
+        if (img.complete && img.naturalWidth > 0) {
+          Promise.resolve(img.decode ? img.decode() : null).then(
+            () => resolve(img),
+            reject
+          );
+        }
+      }), 20000, "preloading image").catch((error) => {
+        imageCache.delete(src);
+        throw error;
+      }));
+    }
+    return imageCache.get(src);
   }
 
   /* ---------- building the page/spread model ---------- */
@@ -203,6 +228,20 @@
       leaf.appendChild(buildSpreadPage(meta));
       return leaf;
     }
+    const cachedPage = pageResultCache.get(pageKey(meta));
+    if (cachedPage) {
+      leaf.appendChild(M.el("img", {
+        class: "leaf-img",
+        src: cachedPage.src,
+        alt: cachedPage.alt || "",
+        loading: "eager",
+        decoding: "async"
+      }));
+      const openBtn = M.el("button", { class: "leaf-open", type: "button", "aria-label": "Open this page in the reader" });
+      bindReaderButton(openBtn, meta);
+      leaf.appendChild(openBtn);
+      return leaf;
+    }
     const status = M.el("div", { class: "leaf-status" }, [
       M.el("div", { class: "spinner", "aria-hidden": "true" }),
       M.el("span", { text: "Loading page\u2026" })
@@ -210,8 +249,16 @@
     leaf.appendChild(status);
     const openBtn = M.el("button", { class: "leaf-open", type: "button", "aria-label": "Open this page in the reader" });
     leaf.appendChild(openBtn);
+    bindReaderButton(openBtn, meta);
     loadLeafImage(leaf, status, openBtn, meta);
     return leaf;
+  }
+
+  function bindReaderButton(button, meta) {
+    if (button.dataset.bound) return;
+    button.dataset.bound = "1";
+    button.addEventListener("click", () => window.METP.reader.open(meta.issue, meta.pageIndex));
+    button.setAttribute("aria-label", "Open " + meta.issue.label + ", page " + (meta.pageIndex + 1) + " in the reader");
   }
 
   /* ---------- data-driven spread pages: month -> left/right -> blocks ----------
@@ -260,7 +307,7 @@
         return M.el("hr", { class: "blk-divider" });
       case "image": {
         if (!b.src) return null;
-        const img = M.el("img", { src: b.src, alt: b.alt || "", loading: "lazy" });
+        const img = M.el("img", { src: b.src, alt: b.alt || "", loading: "eager", decoding: "async" });
         if (b.objectPosition) img.style.objectPosition = b.objectPosition;
         const kids = [img];
         if (b.caption) kids.push(M.el("figcaption", { text: b.caption }));
@@ -290,8 +337,7 @@
       const img = M.el("img", { class: "leaf-img", src: pg.src, alt: pg.alt, loading: "eager", decoding: "async" });
       leaf.insertBefore(img, status);
       status.remove();
-      openBtn.addEventListener("click", () => window.METP.reader.open(meta.issue, meta.pageIndex));
-      openBtn.setAttribute("aria-label", "Open " + meta.issue.label + ", page " + (meta.pageIndex + 1) + " in the reader");
+      bindReaderButton(openBtn, meta);
     }).catch((err) => {
       console.error("[METP] page load failed", err);
       status.textContent = "";
@@ -325,13 +371,11 @@
         loading: "eager",
         decoding: "async"
       });
+      img.src = pg.src;
+      if (img.decode) await img.decode();
       leaf.insertBefore(img, status || null);
       if (status) status.remove();
-      if (openBtn && !openBtn.dataset.bound) {
-        openBtn.dataset.bound = "1";
-        openBtn.addEventListener("click", () => window.METP.reader.open(meta.issue, meta.pageIndex));
-        openBtn.setAttribute("aria-label", "Open " + meta.issue.label + ", page " + (meta.pageIndex + 1) + " in the reader");
-      }
+      if (openBtn) bindReaderButton(openBtn, meta);
     }
     return leaf;
   }
@@ -489,12 +533,22 @@
     // leaf from appearing exactly when the cover or page reaches its most
     // visible angle.
     try {
-      await Promise.all(pages.map((p) => preloadPage(p)));
+      const media = [];
+      pages.forEach((page) => {
+        if (!page.issue || !page.issue.spread) return;
+        [page.issue.spread.left, page.issue.spread.right].forEach((side) => {
+          (side && Array.isArray(side.blocks) ? side.blocks : []).forEach((block) => {
+            if (block && block.type === "image" && block.src) media.push(preloadImage(block.src));
+          });
+        });
+      });
+      await Promise.all(pages.map((p) => preloadPage(p)).concat(media));
       return true;
     } catch (e) {
       console.warn("[METP] spread warm-up incomplete; rendering retry state", e);
       return false;
     }
+
   }
 
   function makeTurnSheet(sourceNode, backNode, dir) {
@@ -525,31 +579,8 @@
   }
 
   function updateTurn(sheet, p, dir) {
-    // Reference model: a real sheet rotates around its bound edge. Do not
-    // skew the entire card while it turns; the skew was the source of the
-    // "giant rigid card" look. The front/back faces stay registered in 3D.
     const e = .5 - .5 * Math.cos(Math.PI * p);
-    const angle = (dir > 0 ? -180 : 180) * e;
-    const curl = Math.sin(Math.PI * e);
-
-    // Slight lift + pitch only at mid-turn. The page remains a single
-    // physical sheet, but this gives the eye a changing depth cue instead of
-    // the "flat card" look. The lift returns exactly to zero at both ends.
-    const lift = curl * 9;
-    const pitch = (dir > 0 ? -1 : 1) * curl * 1.35;
-    const squeeze = 1 - curl * .018;
-    sheet.host.style.transform =
-      "rotateY(" + angle.toFixed(3) + "deg) " +
-      "translateZ(" + lift.toFixed(2) + "px) " +
-      "rotateX(" + pitch.toFixed(3) + "deg) " +
-      "scaleX(" + squeeze.toFixed(4) + ")";
-
-    // A moving edge shadow + a soft paper highlight gives the CSS 3D
-    // reference its page-depth cue without making the sheet look metallic.
-    sheet.frontShade.style.opacity = String(Math.min(.55, curl * .58));
-    sheet.backShade.style.opacity = String(Math.min(.42, curl * .46));
-    sheet.front.style.filter = "brightness(" + (1 - curl * .075).toFixed(3) + ")";
-    sheet.back.style.filter = "brightness(" + (1 - curl * .045).toFixed(3) + ")";
+    updateTurnProgress(sheet, e, dir);
   }
 
   function updateTurnProgress(sheet, progress, dir) {
@@ -678,6 +709,7 @@
   function runPhysicalTurn(sheet, dir, onLand, underlay) {
     if (M.reducedMotion()) {
       onLand();
+      if (underlay) underlay.remove();
       sheet.host.remove();
       slotL.style.visibility = "";
       slotR.style.visibility = "";
@@ -730,7 +762,8 @@
       // Warm the exact destination before creating the moving leaf. This is
       // intentionally a hard prerequisite for animation: a spinner must
       // never become the face of a moving page.
-      await ensureSpreadReady(B.spreads[target]);
+      const ready = await ensureSpreadReady(B.spreads[target]);
+      if (!ready) return;
       if (target === B.cur || flipping) return;
       await animatePhysicalTurn(dir, target, viaTab);
       currentSpreadReady = false;
@@ -768,6 +801,7 @@
       if (sheet) sheet.host.remove();
       slotL.style.visibility = "";
       slotR.style.visibility = "";
+      if (cancelOnly) renderSpreadCore();
       sheet = null;
       underlay = null;
       flipping = false;
@@ -781,7 +815,18 @@
       if (!B.opened || target < 0 || target >= B.spreads.length || flipping || navigationBusy) return false;
 
       navigationBusy = true;
-      await ensureSpreadReady(B.spreads[target]);
+      let ready;
+      try {
+        ready = await ensureSpreadReady(B.spreads[target]);
+      } catch (error) {
+        navigationBusy = false;
+        throw error;
+      }
+      if (!ready) {
+        renderSpreadCore();
+        navigationBusy = false;
+        return false;
+      }
       if (!active) { navigationBusy = false; return false; }
 
       const destination = B.spreads[target] || [];
@@ -886,13 +931,18 @@
       pointerId = e.pointerId;
       try { el.setPointerCapture(pointerId); } catch (err) {}
 
-      const ok = await beginSheet();
-      if (!ok || !active) {
-        active = false;
-        return;
+      try {
+        const ok = await beginSheet();
+        if (!ok || !active) {
+          active = false;
+          return;
+        }
+        progress = 0;
+        updateTurnProgress(sheet, 0, forward ? 1 : -1);
+      } catch (error) {
+        console.error("[METP] drag turn preparation failed", error);
+        cleanup(true);
       }
-      progress = 0;
-      updateTurnProgress(sheet, 0, forward ? 1 : -1);
     });
 
     el.addEventListener("pointermove", (e) => {
@@ -944,8 +994,8 @@
 
   function closedBinderX() {
     if (B.single) return 0;
-    const cs = getComputedStyle(binderEl);
-    const lw = parseFloat(cs.getPropertyValue("--lw")) || 0;
+    const cs = getComputedStyle(binderEl.parentElement);
+    const lw = slotR.offsetWidth;
     const ms = parseFloat(cs.getPropertyValue("--ms")) || 0;
     const tabsGutter = parseFloat(cs.getPropertyValue("--tabs-gutter")) || 0;
     return -((lw + ms) / 2) + tabsGutter / 2;
@@ -955,16 +1005,52 @@
     binderEl.style.transform = "translate3d(" + x.toFixed(2) + "px,0,0) rotate(-.35deg)";
   }
 
-  function coverTransform(progress, opening) {
+  function setCoverHinge() {
+    lid.style.transformOrigin = B.single ? "calc(var(--ms) + 16px) center" : "left center";
+  }
+
+  function setCoverPose(progress, opening) {
     const p = M.clamp(progress, 0, 1);
     const e = .5 - .5 * Math.cos(Math.PI * p);
     const angle = opening ? -180 * e : -180 * (1 - e);
     const lift = Math.sin(Math.PI * e) * 3.5;
-    return "translateZ(" + lift.toFixed(2) + "px) rotateY(" + angle.toFixed(3) + "deg)";
+    lid.style.transform = "translateZ(" + lift.toFixed(2) + "px) rotateY(" + angle.toFixed(3) + "deg)";
+    const frontFacing = angle > -90;
+    lid.querySelector(".lid-face.front").style.visibility = frontFacing ? "visible" : "hidden";
+    lid.querySelector(".lid-face.back").style.visibility = frontFacing ? "hidden" : "visible";
+    return e;
+  }
+
+  function animateCover(opening) {
+    return new Promise((resolve) => {
+      const shade = lid.querySelector(".front .shade");
+      let start = null;
+      function frame(ts) {
+        if (start == null) start = ts;
+        const p = M.clamp((ts - start) / OPEN_MS, 0, 1);
+        const e = setCoverPose(p, opening);
+        paintPaperMotion(p);
+        if (shade) shade.style.opacity = String(Math.min(.50, Math.sin(Math.PI * e) * .58));
+        if (p < 1) requestAnimationFrame(frame);
+        else resolve();
+      }
+
+      if (M.reducedMotion()) {
+        setCoverPose(1, opening);
+        paintPaperMotion(0);
+        if (shade) shade.style.opacity = "0";
+        resolve();
+      } else {
+        requestAnimationFrame(frame);
+      }
+    });
   }
 
   async function waitForCurrentSpread() {
-    currentSpreadReady = await ensureSpreadReady(B.spreads[B.cur]);
+    const revision = assetRevision;
+    const ready = await ensureSpreadReady(B.spreads[B.cur]);
+    if (revision !== assetRevision) return waitForCurrentSpread();
+    currentSpreadReady = ready;
     return currentSpreadReady;
   }
 
@@ -972,7 +1058,7 @@
     const p = M.clamp(progress, 0, 1);
     const s = Math.sin(Math.PI * (.5 - .5 * Math.cos(Math.PI * p)));
     const edge = lid.querySelector(".lid-paper-edge");
-    if (edge) edge.style.opacity = String(Math.min(.82, .18 + s * .64));
+    if (edge) edge.style.opacity = String(Math.min(.82, s * .82));
   }
 
   function openBinder() {
@@ -984,57 +1070,40 @@
     binderEl.setAttribute("data-state", "closed");
     binderEl.setAttribute("data-motion", "opening");
 
-    // Only the whole binder translates from its closed presentation to its
-    // open presentation. The cover itself rotates around its physical hinge.
+    // The binder stays anchored while the cover rotates around its hinge.
     setBinderX(closedX);
     lid.style.visibility = "visible";
     lid.style.opacity = "1";
     lid.style.pointerEvents = "none";
-    lid.style.transformOrigin = "left center";
-    lid.style.transform = coverTransform(0, true);
+    setCoverHinge();
+    setCoverPose(0, true);
     paintPaperMotion(0);
 
     const ready = currentSpreadReady ? Promise.resolve(true) : waitForCurrentSpread();
-    ready.then((ok) => new Promise((resolve) => {
-      if (!ok) renderSpreadCore();
-      M.sound && M.sound.open();
-
-      const duration = OPEN_MS;
-      let start = null;
-
-      function frame(ts) {
-        if (start == null) start = ts;
-        const p = M.clamp((ts - start) / duration, 0, 1);
-        const e = .5 - .5 * Math.cos(Math.PI * p);
-
-        setBinderX(closedX * (1 - e));
-        lid.style.transform = coverTransform(p, true);
-        paintPaperMotion(p);
-
-        const shade = lid.querySelector(".front .shade");
-        if (shade) shade.style.opacity = String(Math.min(.50, Math.sin(Math.PI * e) * .58));
-
-        if (p < 1) requestAnimationFrame(frame);
-        else resolve();
+    ready.then((ok) => {
+      if (!ok) {
+        renderSpreadCore();
+        throw new Error("Current spread is not ready");
       }
-      requestAnimationFrame(frame);
-    })).then(() => {
+      if (!M.reducedMotion()) M.sound && M.sound.open();
+      return animateCover(true);
+    }).then(() => {
       B.opened = true;
       binderEl.setAttribute("data-state", "open");
       binderEl.removeAttribute("data-motion");
-      binderEl.style.transform = "";
       lid.style.opacity = "0";
       lid.style.visibility = "hidden";
       lid.style.pointerEvents = "none";
-      lid.style.transform = "rotateY(-179deg)";
+      setCoverPose(1, true);
+      lid.style.transform = "rotateY(-180deg)";
       paintPaperMotion(0);
       coverMotion = false;
     }).catch((e) => {
       console.error("[METP] binder open failed", e);
-      binderEl.style.transform = "";
+      setBinderX(closedX);
       binderEl.setAttribute("data-state", "closed");
       binderEl.removeAttribute("data-motion");
-      lid.style.transform = "rotateY(0deg)";
+      setCoverPose(0, true);
       lid.style.opacity = "1";
       lid.style.visibility = "visible";
       lid.style.pointerEvents = "";
@@ -1057,39 +1126,24 @@
 
     const closedX = closedBinderX();
 
-    // Start from the exact open position, then close the same hinge in reverse.
+    // Close around the same fixed hinge used during opening.
     binderEl.setAttribute("data-state", "open");
     binderEl.setAttribute("data-motion", "closing");
-    setBinderX(0);
+    setBinderX(closedX);
 
     lid.style.visibility = "visible";
     lid.style.opacity = "1";
     lid.style.pointerEvents = "none";
-    lid.style.transformOrigin = "left center";
-    lid.style.transform = coverTransform(0, false);
+    setCoverHinge();
+    setCoverPose(0, false);
     paintPaperMotion(0);
 
-    const duration = OPEN_MS;
-    let start = null;
-
-    function frame(ts) {
-      if (start == null) start = ts;
-      const p = M.clamp((ts - start) / duration, 0, 1);
-      const e = .5 - .5 * Math.cos(Math.PI * p);
-
-      setBinderX(closedX * e);
-      lid.style.transform = coverTransform(p, false);
-      paintPaperMotion(p);
-
-      const shade = lid.querySelector(".front .shade");
-      if (shade) shade.style.opacity = String(Math.min(.50, Math.sin(Math.PI * e) * .58));
-
-      if (p < 1) requestAnimationFrame(frame);
-      else {
+    animateCover(false).then(() => {
         B.opened = false;
         binderEl.setAttribute("data-state", "closed");
         binderEl.removeAttribute("data-motion");
-        binderEl.style.transform = "";
+        setBinderX(closedX);
+        setCoverPose(1, false);
         lid.style.transform = "rotateY(0deg)";
         lid.style.opacity = "1";
         lid.style.visibility = "visible";
@@ -1097,9 +1151,17 @@
         lid.setAttribute("tabindex", "0");
         paintPaperMotion(0);
         coverMotion = false;
-      }
-    }
-    requestAnimationFrame(frame);
+    }).catch((error) => {
+      console.error("[METP] binder close failed", error);
+      setBinderX(closedX);
+      binderEl.setAttribute("data-state", "open");
+      binderEl.removeAttribute("data-motion");
+      setCoverPose(1, true);
+      lid.style.opacity = "0";
+      lid.style.visibility = "hidden";
+      lid.style.pointerEvents = "none";
+      coverMotion = false;
+    });
   }
 
   lid.addEventListener("click", (e) => {
@@ -1177,32 +1239,37 @@
     bindPeel(document.getElementById("peelLeft"), false);
 
     let resizeT;
+    function syncResponsiveMode() {
+      const single = window.matchMedia("(max-width: 900px)").matches;
+      if (single === B.single) return;
+      if (coverMotion || flipping || navigationBusy) {
+        resizeT = setTimeout(syncResponsiveMode, 200);
+        return;
+      }
+      const curPage = (B.spreads[B.cur] || []).find(Boolean) || null;
+      B.single = single;
+      binderEl.setAttribute("data-mode", single ? "single" : "dual");
+      if (B.opened) setBinderX(closedBinderX());
+      else binderEl.style.transform = "";
+      const m = buildModel(B.issues, single);
+      B.pages = m.pages;
+      B.spreads = m.spreads;
+      let newCur = B.spreads.length - 1;
+      if (curPage) {
+        for (let s = 0; s < B.spreads.length; s++) {
+          const cand = B.spreads[s].find(Boolean);
+          if (cand && samePage(cand, curPage)) { newCur = s; break; }
+        }
+      }
+      B.cur = newCur;
+      renderSpread();
+      warmSpread(B.spreads[B.cur]);
+      warmSpread(B.spreads[B.cur - 1]);
+      warmSpread(B.spreads[B.cur + 1]);
+    }
     window.addEventListener("resize", () => {
       clearTimeout(resizeT);
-      resizeT = setTimeout(() => {
-        const single = window.matchMedia("(max-width: 900px)").matches;
-        if (single !== B.single) {
-          if (flipping || navigationBusy) return;
-          const curPage = (B.spreads[B.cur] || []).find(Boolean) || null;
-          B.single = single;
-          binderEl.setAttribute("data-mode", single ? "single" : "dual");
-          const m = buildModel(B.issues, single);
-          B.pages = m.pages;
-          B.spreads = m.spreads;
-          let newCur = B.spreads.length - 1;
-          if (curPage) {
-            for (let s = 0; s < B.spreads.length; s++) {
-              const cand = B.spreads[s].find(Boolean);
-              if (cand && samePage(cand, curPage)) { newCur = s; break; }
-            }
-          }
-          B.cur = newCur;
-          renderSpread();
-          warmSpread(B.spreads[B.cur]);
-          warmSpread(B.spreads[B.cur - 1]);
-          warmSpread(B.spreads[B.cur + 1]);
-        }
-      }, 150);
+      resizeT = setTimeout(syncResponsiveMode, 150);
     });
 
     // Keyboard paging when the binder area has focus
@@ -1223,7 +1290,12 @@
     // A background refresh can land mid-flip; rebuilding the spread model
     // under an in-progress animation would tear the DOM out from under it.
     // Defer briefly rather than fighting the animation for the same slots.
-    if (flipping || navigationBusy) { setTimeout(() => B.setIssues(issues), 200); return; }
+    if (coverMotion || flipping || navigationBusy) { setTimeout(() => B.setIssues(issues), 200); return; }
+    assetRevision++;
+    pageCache.clear();
+    pageResultCache.clear();
+    imageCache.clear();
+    currentSpreadReady = false;
     // Preserve the visible month by year+month, not by database UUID. The
     // bundled fallback uses a stable human key while Supabase rows use UUIDs;
     // comparing IDs here used to make August jump to September after refresh.
@@ -1252,4 +1324,3 @@
   B.goToSpread = goToSpread;
   B.rerender = renderSpread;
 })();
-
