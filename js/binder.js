@@ -682,6 +682,8 @@
       await ensureSpreadReady(B.spreads[target]);
       if (target === B.cur || flipping) return;
       await animatePhysicalTurn(dir, target, viaTab);
+      currentSpreadReady = false;
+      currentSpreadReady = await ensureSpreadReady(B.spreads[B.cur]);
       renderMeta();
       renderTabs();
     } catch (err) {
