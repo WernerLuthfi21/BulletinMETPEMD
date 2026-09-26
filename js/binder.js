@@ -1003,6 +1003,7 @@
 
   function setBinderX(x) {
     binderEl.style.transform = "translate3d(" + x.toFixed(2) + "px,0,0) rotate(-.35deg)";
+    tabsEl.style.transform = B.single ? "" : "translateX(" + x.toFixed(2) + "px)";
   }
 
   function setCoverHinge() {
@@ -1021,7 +1022,7 @@
     return e;
   }
 
-  function animateCover(opening) {
+  function animateCover(opening, fromX, toX) {
     return new Promise((resolve) => {
       const shade = lid.querySelector(".front .shade");
       let start = null;
@@ -1029,6 +1030,7 @@
         if (start == null) start = ts;
         const p = M.clamp((ts - start) / OPEN_MS, 0, 1);
         const e = setCoverPose(p, opening);
+        setBinderX(fromX + (toX - fromX) * e);
         paintPaperMotion(p);
         if (shade) shade.style.opacity = String(Math.min(.50, Math.sin(Math.PI * e) * .58));
         if (p < 1) requestAnimationFrame(frame);
@@ -1037,6 +1039,7 @@
 
       if (M.reducedMotion()) {
         setCoverPose(1, opening);
+        setBinderX(toX);
         paintPaperMotion(0);
         if (shade) shade.style.opacity = "0";
         resolve();
@@ -1068,9 +1071,6 @@
 
     const closedX = closedBinderX();
     binderEl.setAttribute("data-state", "closed");
-    binderEl.setAttribute("data-motion", "opening");
-
-    // The binder stays anchored while the cover rotates around its hinge.
     setBinderX(closedX);
     lid.style.visibility = "visible";
     lid.style.opacity = "1";
@@ -1086,11 +1086,14 @@
         throw new Error("Current spread is not ready");
       }
       if (!M.reducedMotion()) M.sound && M.sound.open();
-      return animateCover(true);
+      binderEl.setAttribute("data-motion", "opening");
+      setBinderX(closedX);
+      return animateCover(true, closedX, 0);
     }).then(() => {
       B.opened = true;
       binderEl.setAttribute("data-state", "open");
       binderEl.removeAttribute("data-motion");
+      setBinderX(0);
       lid.style.opacity = "0";
       lid.style.visibility = "hidden";
       lid.style.pointerEvents = "none";
@@ -1126,10 +1129,9 @@
 
     const closedX = closedBinderX();
 
-    // Close around the same fixed hinge used during opening.
     binderEl.setAttribute("data-state", "open");
     binderEl.setAttribute("data-motion", "closing");
-    setBinderX(closedX);
+    setBinderX(0);
 
     lid.style.visibility = "visible";
     lid.style.opacity = "1";
@@ -1138,7 +1140,7 @@
     setCoverPose(0, false);
     paintPaperMotion(0);
 
-    animateCover(false).then(() => {
+    animateCover(false, 0, closedX).then(() => {
         B.opened = false;
         binderEl.setAttribute("data-state", "closed");
         binderEl.removeAttribute("data-motion");
@@ -1153,7 +1155,7 @@
         coverMotion = false;
     }).catch((error) => {
       console.error("[METP] binder close failed", error);
-      setBinderX(closedX);
+      setBinderX(0);
       binderEl.setAttribute("data-state", "open");
       binderEl.removeAttribute("data-motion");
       setCoverPose(1, true);
@@ -1241,16 +1243,23 @@
     let resizeT;
     function syncResponsiveMode() {
       const single = window.matchMedia("(max-width: 900px)").matches;
-      if (single === B.single) return;
       if (coverMotion || flipping || navigationBusy) {
         resizeT = setTimeout(syncResponsiveMode, 200);
+        return;
+      }
+      if (single === B.single) {
+        // Recompute the desktop cover offset when the leaf width changes within the same mode.
+        if (!single && !B.opened && binderEl.dataset.state === "closed") setBinderX(closedBinderX());
         return;
       }
       const curPage = (B.spreads[B.cur] || []).find(Boolean) || null;
       B.single = single;
       binderEl.setAttribute("data-mode", single ? "single" : "dual");
-      if (B.opened) setBinderX(closedBinderX());
-      else binderEl.style.transform = "";
+      if (B.opened) setBinderX(0);
+      else {
+        binderEl.style.transform = "";
+        tabsEl.style.transform = "";
+      }
       const m = buildModel(B.issues, single);
       B.pages = m.pages;
       B.spreads = m.spreads;
