@@ -1218,6 +1218,13 @@
     B.selectedIssueId = B.issues[B.issues.length - 1].id;
     renderSpread();
     renderTabs();
+    // The binder markup starts at data-state="closed", but nothing had ever
+    // positioned the spread at its closed offset before the first open/close
+    // animation ran. That left the two-page spread sitting at its "open"
+    // translate(0,0) position from first paint, with only the cover's opacity
+    // making it look closed — so the left leaf was visible right alongside
+    // the still-opaque cover instead of being tucked out of view.
+    if (!B.opened) setBinderX(closedBinderX());
     // Warm the visible spread immediately. Opening is allowed to animate only
     // after this promise resolves, so the first open frame cannot be blank.
     waitForCurrentSpread();
