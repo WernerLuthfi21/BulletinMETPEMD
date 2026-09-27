@@ -79,8 +79,6 @@
   const FALLBACK_TRACKS = [
     { id: "ambient-room-tone", label: "Ambient Room Tone", src: "assets/audio/ambient-room-tone.m4a" },
     { id: "astaga-bercanda", label: "Astaga Bercanda", src: "assets/audio/astaga-bercanda.mp3" },
-    { id: "mechanical-room-tone", label: "Mechanical Room Tone", src: "assets/audio/mechanical-room-tone.mp3" },
-    { id: "read", label: "Read", src: "assets/audio/read.mp3" },
     { id: "dj-mabur-duwur-melayang-layang", label: "DJ Mabur Duwur Melayang Layang", src: "assets/audio/dj-mabur-duwur-melayang-layang.mp3" },
     { id: "kicau-mania-ndarboy-genk-x-banditoz", label: "Kicau Mania Ndarboy Genk x Banditoz", src: "assets/audio/kicau-mania-ndarboy-genk-x-banditoz.mp3" }
   ];
