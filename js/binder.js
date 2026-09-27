@@ -1087,10 +1087,12 @@
   // the lid element, so hiding the lid at the end cannot hide the sheet.
   function syncLidBackPage() {
     if (B.single) return;
-    const sheet = document.getElementById("lidSheet");
-    if (!sheet) return;
+    const face = lid.querySelector(".lid-face.back");
+    if (!face) return;
 
-    sheet.textContent = "";
+    const old = face.querySelector(".lid-back-page");
+    if (old) old.remove();
+
     const spread = B.spreads[B.cur] || [];
     const current = currentPageOf(spread);
     const first = current
@@ -1106,16 +1108,10 @@
       ? sourceLeaf.cloneNode(true)
       : buildLeafContent(pageMeta(first), "right");
 
-    page.classList.add("lid-bound-sheet-leaf");
+    page.classList.add("lid-back-page");
     page.querySelectorAll(".leaf-open").forEach((el) => el.remove());
-
-    const face = M.el("div", { class: "lid-sheet-face" });
-    face.appendChild(page);
-    sheet.appendChild(face);
-
-    sheet.style.opacity = "0";
-    sheet.style.visibility = "visible";
-    sheet.style.transform = "translate3d(0,0,0) rotateY(0deg) rotateX(0deg)";
+    page.setAttribute("aria-hidden", "true");
+    face.insertBefore(page, face.firstChild);
   }
 
   function openBinder() {
@@ -1127,20 +1123,16 @@
     lid.setAttribute("tabindex", "-1");
     M.sound && M.sound.open();
 
-    const sheet = B.single ? null : document.getElementById("lidSheet");
     if (M.reducedMotion()) {
       lid.style.opacity = "0";
       lid.style.pointerEvents = "none";
-      if (sheet) {
-        sheet.style.opacity = "0";
-        sheet.style.visibility = "hidden";
-      }
       return;
     }
 
     lid.style.opacity = "1";
     lid.style.pointerEvents = "auto";
     lid.style.transformOrigin = "left center";
+    lid.style.transition = "none";
 
     const frontShade = lid.querySelector(".front .shade");
     const shadow = binderEl.querySelector(".b-shadow");
@@ -1150,39 +1142,21 @@
     function frame(ts) {
       if (start == null) start = ts;
       const t = M.clamp((ts - start) / dur, 0, 1);
-
-      // Smooth physical acceleration/deceleration, deliberately independent
-      // from the already-safe page-turn engine.
       const eased = t * t * (3 - 2 * t);
       const arc = Math.sin(Math.PI * eased);
       const lift = arc * 5;
       const pitch = -arc * 0.8;
       const angle = -eased * 178;
 
-      const transform =
+      lid.style.transform =
         "translate3d(0," + (-lift * 0.18).toFixed(2) + "px," + lift.toFixed(2) + "px) " +
         "rotateY(" + angle.toFixed(3) + "deg) " +
         "rotateX(" + pitch.toFixed(3) + "deg)";
-
-      lid.style.transform = transform;
-
-      if (sheet) {
-        sheet.style.transform = transform;
-
-        // The first page is invisible while physically underneath the cover,
-        // emerges naturally after edge-on, then crossfades into the real page
-        // already settled on the binder near the end of the motion.
-        const reveal = M.clamp((eased - 0.28) / 0.42, 0, 1);
-        const settle = M.clamp((0.96 - eased) / 0.10, 0, 1);
-        sheet.style.opacity = String(Math.min(0.94, reveal) * settle);
-        sheet.style.visibility = "visible";
-      }
 
       lid.style.setProperty("--lid-light-x", Math.round(22 + eased * 18) + "%");
       lid.style.setProperty("--lid-light-y", Math.round(12 + arc * 10) + "%");
 
       if (frontShade) frontShade.style.opacity = String(Math.min(.34, arc * .34));
-
       if (shadow) {
         shadow.style.opacity = String(.55 - arc * .12);
         shadow.style.transform =
@@ -1191,16 +1165,17 @@
 
       if (t < 1) {
         requestAnimationFrame(frame);
-      } else {
-        if (sheet) {
-          sheet.style.opacity = "0";
-          sheet.style.visibility = "hidden";
-          sheet.style.transform = "translate3d(0,0,0) rotateY(-178deg) rotateX(0deg)";
-        }
-        lid.style.opacity = "0";
-        lid.style.pointerEvents = "none";
-        lid.style.transform = "translate3d(0,0,0) rotateY(-178deg) rotateX(0deg)";
+        return;
       }
+
+      // The rear page is now aligned with the real page beneath it. Fade only
+      // the lid away so the physical page visibly settles into the binder
+      // instead of exposing a mirrored cover for the final frame.
+      lid.style.transition = "opacity 140ms ease";
+      lid.style.opacity = "0";
+      lid.style.pointerEvents = "none";
+      lid.style.transform =
+        "translate3d(0,0,0) rotateY(-178deg) rotateX(0deg)";
     }
 
     requestAnimationFrame(frame);
@@ -1208,6 +1183,7 @@
 
   function closeBinder() {
     if (!B.opened || flipping || navigationBusy) return;
+
     if (!B.single) syncLidBackPage();
 
     B.opened = false;
@@ -1215,22 +1191,16 @@
     lid.style.pointerEvents = "";
     M.sound && M.sound.close();
 
-    const sheet = B.single ? null : document.getElementById("lidSheet");
-
     if (M.reducedMotion()) {
       binderEl.setAttribute("data-state", "closed");
       lid.style.opacity = "1";
       lid.style.transform = "translate3d(0,0,0) rotateY(0deg) rotateX(0deg)";
-      if (sheet) {
-        sheet.style.opacity = "0";
-        sheet.style.visibility = "hidden";
-        sheet.style.transform = "translate3d(0,0,0) rotateY(0deg) rotateX(0deg)";
-      }
       return;
     }
 
     lid.style.opacity = "1";
     lid.style.transformOrigin = "left center";
+    lid.style.transition = "none";
 
     const frontShade = lid.querySelector(".front .shade");
     const shadow = binderEl.querySelector(".b-shadow");
@@ -1240,33 +1210,21 @@
     function frame(ts) {
       if (start == null) start = ts;
       const t = M.clamp((ts - start) / dur, 0, 1);
-
       const eased = t * t * (3 - 2 * t);
       const arc = Math.sin(Math.PI * (1 - eased));
       const lift = arc * 5;
       const pitch = -arc * 0.8;
       const angle = -178 + eased * 178;
 
-      const transform =
+      lid.style.transform =
         "translate3d(0," + (-lift * 0.18).toFixed(2) + "px," + lift.toFixed(2) + "px) " +
         "rotateY(" + angle.toFixed(3) + "deg) " +
         "rotateX(" + pitch.toFixed(3) + "deg)";
-
-      lid.style.transform = transform;
-
-      if (sheet) {
-        sheet.style.transform = transform;
-        const reveal = M.clamp((eased - 0.04) / 0.36, 0, 1);
-        const hide = M.clamp((1 - eased) / 0.18, 0, 1);
-        sheet.style.opacity = String(Math.min(0.94, reveal) * hide);
-        sheet.style.visibility = "visible";
-      }
 
       lid.style.setProperty("--lid-light-x", Math.round(40 - eased * 18) + "%");
       lid.style.setProperty("--lid-light-y", Math.round(12 + arc * 10) + "%");
 
       if (frontShade) frontShade.style.opacity = String(Math.min(.34, arc * .34));
-
       if (shadow) {
         shadow.style.opacity = String(.43 + arc * .12);
         shadow.style.transform =
@@ -1275,17 +1233,15 @@
 
       if (t < 1) {
         requestAnimationFrame(frame);
-      } else {
-        if (sheet) {
-          sheet.style.opacity = "0";
-          sheet.style.visibility = "hidden";
-          sheet.style.transform = "translate3d(0,0,0) rotateY(0deg) rotateX(0deg)";
-        }
-        binderEl.setAttribute("data-state", "closed");
-        lid.style.transform = "translate3d(0,0,0) rotateY(0deg) rotateX(0deg)";
+        return;
       }
-    }
 
+      binderEl.setAttribute("data-state", "closed");
+      lid.style.transition = "none";
+      lid.style.opacity = "1";
+      lid.style.transform =
+        "translate3d(0,0,0) rotateY(0deg) rotateX(0deg)";
+    }
     requestAnimationFrame(frame);
   }
 
