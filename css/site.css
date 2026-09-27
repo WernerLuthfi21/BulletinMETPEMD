@@ -388,6 +388,15 @@ img{max-width:100%}
 .physical-turn-underlay .leaf{
   position:absolute;inset:0;width:100%;height:100%;
 }
+.physical-turn-underlay::after{
+  content:"";position:absolute;inset:0;z-index:6;pointer-events:none;
+  background:radial-gradient(ellipse 54% 78% at 48% 50%,rgba(12,5,2,.34),transparent 72%);
+  opacity:var(--turn-cast-opacity,0);
+  transform:scale(var(--turn-cast-scale,.92));
+  transform-origin:50% 50%;
+  mix-blend-mode:multiply;
+  will-change:opacity,transform;
+}
 
 .physical-turn{
   position:absolute;top:0;height:100%;z-index:20;pointer-events:none;
@@ -404,9 +413,14 @@ img{max-width:100%}
   border:1px solid rgba(60,45,28,.10);
   box-shadow:0 5px 10px rgba(18,7,3,.14);
 }
-/* A narrow moving-looking paper edge. It is intentionally subtle: the
-   geometry still comes from the 3D hinge, while this highlight gives the
-   eye a rolled paper edge instead of a plastic card edge. */
+.physical-turn-face::before{
+  content:"";position:absolute;inset:-10% -34%;z-index:10;pointer-events:none;
+  background:linear-gradient(108deg,transparent 35%,rgba(255,255,255,.72) 50%,transparent 65%);
+  opacity:var(--page-light-opacity,0);
+  transform:translate3d(var(--page-sheen-x, -58%),0,0);
+  mix-blend-mode:screen;
+  will-change:opacity,transform;
+}
 .physical-turn-face::after{
   content:"";position:absolute;top:0;bottom:0;right:0;width:18px;
   pointer-events:none;z-index:9;
@@ -414,6 +428,7 @@ img{max-width:100%}
     linear-gradient(90deg,transparent 0%,rgba(255,255,255,.05) 35%,
     rgba(255,255,255,.55) 55%,rgba(72,50,32,.18) 78%,transparent 100%);
   opacity:.48;
+  mix-blend-mode:normal;
 }
 .physical-turn-face.back::after{
   right:auto;left:0;
@@ -421,6 +436,9 @@ img{max-width:100%}
     linear-gradient(90deg,transparent 0%,rgba(72,50,32,.18) 22%,
     rgba(255,255,255,.45) 48%,rgba(255,255,255,.05) 72%,transparent 100%);
 }
+/* A narrow moving-looking paper edge. It is intentionally subtle: the
+   geometry still comes from the 3D hinge, while this highlight gives the
+   eye a rolled paper edge instead of a plastic card edge. */
 .physical-turn-face.front{transform:rotateY(0deg) translateZ(.7px)}
 .physical-turn-face.back{transform:rotateY(180deg) translateZ(.7px)}
 .physical-turn-face .leaf{
@@ -431,9 +449,11 @@ img{max-width:100%}
 .physical-turn-shade{
   position:absolute;inset:0;z-index:8;pointer-events:none;
   background:
-    linear-gradient(90deg,rgba(8,3,1,.38),rgba(8,3,1,.08) 20%,transparent 58%),
-    linear-gradient(100deg,transparent 35%,rgba(255,255,255,.16) 50%,transparent 66%);
+    linear-gradient(90deg,rgba(8,3,1,.64),rgba(8,3,1,.10) 22%,transparent 62%),
+    linear-gradient(100deg,transparent 35%,rgba(255,255,255,.18) 50%,transparent 66%);
+  opacity:var(--page-fold-opacity,0);
   mix-blend-mode:multiply;
+  will-change:opacity;
 }
 .physical-turn-face.back .physical-turn-shade{
   background:
@@ -442,10 +462,20 @@ img{max-width:100%}
 }
 @media (prefers-reduced-motion:reduce){
   .physical-turn{transition:none!important}
+  .physical-turn-face::before,
+  .physical-turn-face::after,
+  .physical-turn-underlay::after,
+  .lid-face.front::before,
+  .lid-face.front::after,
+  .lid-reveal-page::after{
+    opacity:0!important;transform:none!important;
+  }
 }
  
 @media (max-width:900px){
   .physical-turn{z-index:40}
+  .physical-turn-face::before,
+  .physical-turn-underlay::after{display:none!important}
   /* Mobile uses one printed page per physical sheet. Page 2 is a separate
      underlay, so the turning sheet must not show a second page on its back. */
   .binder[data-mode="single"] .physical-turn-face.back{visibility:hidden}
@@ -625,6 +655,14 @@ button.key svg,a.key svg{width:17px;height:17px;flex:none}
     linear-gradient(90deg,rgba(30,16,8,.13),transparent 8% 82%,rgba(0,0,0,.05)),
     linear-gradient(180deg,rgba(255,255,255,.18),transparent 16%,rgba(0,0,0,.03));
 }
+.lid-reveal-page::after{
+  content:"";position:absolute;inset:-8% -30%;z-index:6;pointer-events:none;
+  background:linear-gradient(108deg,transparent 35%,rgba(255,255,255,.48) 50%,transparent 65%);
+  transform:translate3d(var(--cover-sheen-x,-52%),0,0);
+  opacity:calc(var(--cover-light,0) * .72);
+  mix-blend-mode:screen;
+  will-change:opacity,transform;
+}
 
 .lid-face .shade{
   position:absolute;inset:0;z-index:10;
@@ -634,11 +672,22 @@ button.key svg,a.key svg{width:17px;height:17px;flex:none}
   transition:opacity .08s linear;
 }
 .lid-hinge{position:absolute;left:0;top:0;bottom:0;width:26px;background:linear-gradient(90deg,rgba(0,0,0,.42),rgba(0,0,0,.10) 60%,transparent);pointer-events:none}
-.lid-face.front::after{
-  content:"";position:absolute;inset:0;pointer-events:none;
-  background:linear-gradient(108deg,transparent 24%,rgba(255,244,235,.14) 42%,transparent 58%);
-  transform:translateX(-35%);opacity:.0;
+.lid-face.front::before{
+  content:"";position:absolute;inset:-8% -30%;z-index:8;pointer-events:none;
+  background:linear-gradient(108deg,transparent 35%,rgba(255,255,255,.65) 50%,transparent 65%);
+  transform:translate3d(var(--cover-sheen-x,-52%),0,0);
+  opacity:var(--cover-light,0);
   mix-blend-mode:screen;
+  will-change:opacity,transform;
+}
+.lid-face.front::after{
+  content:"";position:absolute;inset:0;pointer-events:none;z-index:9;
+  background:
+    linear-gradient(90deg,rgba(10,2,3,.34),transparent 17% 82%,rgba(10,2,3,.10)),
+    linear-gradient(108deg,transparent 24%,rgba(255,244,235,.14) 42%,transparent 58%);
+  transform:translateX(-35%);opacity:var(--cover-fold-shadow,0);
+  mix-blend-mode:multiply;
+  will-change:opacity,transform;
 }
 .binder[data-state="open"] .lid-face.front::after{opacity:.75}
 .lid-hinge{box-shadow:inset -6px 0 9px rgba(0,0,0,.18)}
