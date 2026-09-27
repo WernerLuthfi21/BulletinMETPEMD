@@ -218,6 +218,12 @@
   function buildLeafContent(meta, side) {
     const leaf = M.el("div", { class: "leaf", dataset: { side } });
     if (!meta) { leaf.classList.add("leaf-back-paper"); return leaf; }
+    if (!meta.placeholder && meta.issue && meta.issue.displayPageCount > 1) {
+      leaf.appendChild(M.el("div", {
+        class: "leaf-page-mark",
+        text: meta.issue.label + " #" + (meta.pageIndex + 1)
+      }));
+    }
     if (meta.placeholder) {
       leaf.classList.add("leaf-plain");
       leaf.appendChild(buildPlaceholder(meta));
@@ -605,7 +611,9 @@
     // Desktop keeps the mirrored left/right physical turn.
     // Mobile keeps the left hinge, but backward turns use the opposite
     // 3D rotation path so the sheet folds outward instead of collapsing inward.
-    const angle = (B.single ? (dir > 0 ? -180 : 180) : (dir > 0 ? -180 : 180)) * p;
+    // Mobile uses one consistent physical hinge: every sheet leaves to the left.
+    // Backward navigation changes the destination sheet, not the fold direction.
+    const angle = (B.single ? -180 : (dir > 0 ? -180 : 180)) * p;
     const curl = Math.sin(Math.PI * p);
     const lift = curl * (B.single ? 0.9 : 3.0);
     const pitch = (dir > 0 ? -1 : 1) * curl * (B.single ? 0 : 0.55);
