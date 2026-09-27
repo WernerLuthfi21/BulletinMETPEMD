@@ -519,8 +519,13 @@
   // Going backward is the exact mirror: LEFT turns to the RIGHT and its back
   // is the destination RIGHT page. This is the key invariant that prevents
   // the old "two cards spinning at once" artifact.
-  const FLIP_MS = 900;
-  const OPEN_MS = 1040;
+  const FLIP_DESKTOP_MS = 780;
+  const FLIP_SINGLE_MS = 620;
+  const OPEN_MS = 960;
+
+  function flipDuration() {
+    return B.single ? FLIP_SINGLE_MS : FLIP_DESKTOP_MS;
+  }
 
   function leafNode(slot) {
     return slot && slot.firstElementChild ? slot.firstElementChild : null;
@@ -564,7 +569,7 @@
     const front = M.el("div", { class: "physical-turn-face front" });
     const back = M.el("div", { class: "physical-turn-face back" });
     if (sourceNode) front.appendChild(sourceNode);
-    back.appendChild(backNode ? backNode.cloneNode(true) : buildLeafContent(null, isForward ? "left" : "right"));
+    back.appendChild(backNode || buildLeafContent(null, isForward ? "left" : "right"));
 
     const frontShade = M.el("div", { class: "physical-turn-shade" });
     const backShade = M.el("div", { class: "physical-turn-shade" });
@@ -587,16 +592,14 @@
     const p = M.clamp(progress, 0, 1);
     const angle = (dir > 0 ? -180 : 180) * p;
     const curl = Math.sin(Math.PI * p);
-    const lift = curl * 9;
-    const pitch = (dir > 0 ? -1 : 1) * curl * 1.35;
+    const lift = curl * (B.single ? 0.9 : 3.0);
+    const pitch = (dir > 0 ? -1 : 1) * curl * (B.single ? 0 : 0.55);
     sheet.host.style.transform =
       "rotateY(" + angle.toFixed(3) + "deg) " +
       "translateZ(" + lift.toFixed(2) + "px) " +
       "rotateX(" + pitch.toFixed(3) + "deg)";
-    sheet.frontShade.style.opacity = String(Math.min(.58, curl * .62));
-    sheet.backShade.style.opacity = String(Math.min(.44, curl * .48));
-    sheet.front.style.filter = "brightness(" + (1 - curl * .075).toFixed(3) + ")";
-    sheet.back.style.filter = "brightness(" + (1 - curl * .045).toFixed(3) + ")";
+    sheet.frontShade.style.opacity = String(Math.min(.5, curl * .52));
+    sheet.backShade.style.opacity = String(Math.min(.38, curl * .42));
   }
 
   function makeTurnUnderlay(node, left, width) {
@@ -616,18 +619,14 @@
     if (B.single) {
       const source = leafNode(slotR);
       if (!source) return Promise.resolve();
-      const sourcePage = destination.length ? (B.spreads[B.cur] || [null, null])[1] : null;
-      await hydrateLeafImage(source, pageMeta(sourcePage));
+      const currentSpread = B.spreads[B.cur] || [null, null];
+      await hydrateLeafImage(source, pageMeta(currentSpread[1]));
       const destPage = destination.find(Boolean) || null;
       const back = destPage
         ? await buildReadyLeafContent(pageMeta(destPage), "right")
         : await buildReadyLeafContent(null, "right");
-      const under = makeTurnUnderlay(
-        destPage
-          ? await buildReadyLeafContent(pageMeta(destPage), "right")
-          : await buildReadyLeafContent(null, "right"),
-        0, rect.width
-      );
+      // Mobile is a single physical sheet. The destination belongs on the
+      // sheet's back face; do not create a second visible underlay/page.
       const sheet = makeTurnSheet(source, back, dir);
       slotR.style.visibility = "hidden";
       return runPhysicalTurn(sheet, dir, () => {
@@ -637,7 +636,7 @@
           if (first) B.selectedIssueId = first.issue.id;
         }
         renderSpreadCore();
-      }, under);
+      }, null);
     }
 
     if (dir > 0) {
@@ -717,7 +716,7 @@
     flipping = true;
     M.sound && M.sound.flip();
 
-    const duration = FLIP_MS;
+    const duration = flipDuration();
     let start = null;
     return new Promise((resolve) => {
       let finished = false;
@@ -762,7 +761,7 @@
       // never become the face of a moving page.
       const ready = await ensureSpreadReady(B.spreads[target]);
       if (!ready) return;
-      if (target === B.cur || flipping) return;
+      if (target === B.cur || flipping || coverMotion || !B.opened) return;
       await animatePhysicalTurn(dir, target, viaTab);
       currentSpreadReady = false;
       currentSpreadReady = await ensureSpreadReady(B.spreads[B.cur]);
@@ -793,6 +792,11 @@
     let underlay = null;
     let progress = 0;
     let dragWidth = 1;
+    let startY = 0;
+    let lastY = 0;
+    let lastMoveTime = 0;
+    let dragVelocity = 0;
+    let gestureAxis = 0; // 1 = horizontal, -1 = vertical/cancelled
     let clickSuppressed = false;
 
     function cleanup(cancelOnly) {
@@ -839,6 +843,7 @@
         const dest = destination.find(Boolean) || null;
         const currentSpread = B.spreads[B.cur] || [null, null];
         await hydrateLeafImage(source, pageMeta(currentSpread[1]));
+        if (!active) { navigationBusy = false; return false; }
         // Single preparation for the destination page: the underlay behind
         // the turning sheet needs the same content as the sheet's own back
         // face, but as a separate DOM node (it can't share the node the
@@ -850,8 +855,10 @@
         const back = dest
           ? await buildReadyLeafContent(pageMeta(dest), "right")
           : await buildReadyLeafContent(null, "right");
-        underlay = makeTurnUnderlay(back.cloneNode(true), 0, rect.width);
-        if (!active) { underlay.remove(); navigationBusy = false; return false; }
+        if (!active) { navigationBusy = false; return false; }
+        // Mobile uses one sheet; this clone remains only as a prepared
+        // fallback for the existing underlay path and is not displayed.
+        if (!active) { navigationBusy = false; return false; }
         sheet = makeTurnSheet(source, back, forward ? 1 : -1);
         slotR.style.visibility = "hidden";
       } else if (forward) {
@@ -859,15 +866,15 @@
         if (!source) { navigationBusy = false; return false; }
         const currentSpread = B.spreads[B.cur] || [null, null];
         await hydrateLeafImage(source, pageMeta(currentSpread[1]));
+        if (!active) { navigationBusy = false; return false; }
         const back = destination[0]
           ? await buildReadyLeafContent(pageMeta(destination[0]), "left")
           : await buildReadyLeafContent(null, "left");
-        underlay = makeTurnUnderlay(
-          destination[1]
-            ? await buildReadyLeafContent(pageMeta(destination[1]), "right")
-            : await buildReadyLeafContent(null, "right"),
-          half, half
-        );
+        const underlayNode = destination[1]
+          ? await buildReadyLeafContent(pageMeta(destination[1]), "right")
+          : await buildReadyLeafContent(null, "right");
+        if (!active) { navigationBusy = false; return false; }
+        underlay = makeTurnUnderlay(underlayNode, half, half);
         if (!active) { underlay.remove(); navigationBusy = false; return false; }
         sheet = makeTurnSheet(source, back, 1);
         slotR.style.visibility = "hidden";
@@ -876,15 +883,15 @@
         if (!source) { navigationBusy = false; return false; }
         const currentSpread = B.spreads[B.cur] || [null, null];
         await hydrateLeafImage(source, pageMeta(currentSpread[0]));
+        if (!active) { navigationBusy = false; return false; }
         const back = destination[1]
           ? await buildReadyLeafContent(pageMeta(destination[1]), "right")
           : await buildReadyLeafContent(null, "right");
-        underlay = makeTurnUnderlay(
-          destination[0]
-            ? await buildReadyLeafContent(pageMeta(destination[0]), "left")
-            : await buildReadyLeafContent(null, "left"),
-          0, half
-        );
+        const underlayNode = destination[0]
+          ? await buildReadyLeafContent(pageMeta(destination[0]), "left")
+          : await buildReadyLeafContent(null, "left");
+        if (!active) { navigationBusy = false; return false; }
+        underlay = makeTurnUnderlay(underlayNode, 0, half);
         if (!active) { underlay.remove(); navigationBusy = false; return false; }
         sheet = makeTurnSheet(source, back, -1);
         slotL.style.visibility = "hidden";
@@ -946,6 +953,10 @@
       pending = true;
       clickSuppressed = false;
       startX = lastX = e.clientX;
+      startY = lastY = e.clientY;
+      lastMoveTime = performance.now();
+      dragVelocity = 0;
+      gestureAxis = 0;
       pointerId = e.pointerId;
       try { el.setPointerCapture(pointerId); } catch (err) {}
 
@@ -963,30 +974,72 @@
       }
     });
 
+    function dampedProgress(raw) {
+      const p = Math.max(0, raw);
+      if (p <= .72) return p;
+      const tail = M.clamp((p - .72) / .28, 0, 1);
+      return .72 + .28 * (1 - Math.pow(1 - tail, 1.65));
+    }
+
     el.addEventListener("pointermove", (e) => {
       if (!active || e.pointerId !== pointerId || !sheet) return;
+
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      if (!gestureAxis && Math.hypot(dx, dy) > 8) {
+        gestureAxis = Math.abs(dx) >= Math.abs(dy) * 1.15 ? 1 : -1;
+        if (gestureAxis < 0) {
+          moved = true;
+          clickSuppressed = true;
+          active = false;
+          animateRelease(0, forward ? 1 : -1, false);
+          return;
+        }
+      }
+      if (gestureAxis < 0) return;
+
       lastX = e.clientX;
+      lastY = e.clientY;
       const raw = forward
         ? (startX - lastX) / dragWidth
         : (lastX - startX) / dragWidth;
-      progress = M.clamp(raw, 0, 1);
-      if (Math.abs(lastX - startX) > 6) { moved = true; clickSuppressed = true; }
+      const nextProgress = M.clamp(dampedProgress(raw), 0, 1);
+      const now = performance.now();
+      const dt = Math.max(8, now - lastMoveTime);
+      const dp = nextProgress - progress;
+      dragVelocity = dragVelocity * .78 + (dp / (dt / 1000)) * .22;
+      progress = nextProgress;
+      lastMoveTime = now;
+
+      if (Math.hypot(dx, dy) > 6) { moved = true; clickSuppressed = true; }
       updateTurnProgress(sheet, progress, forward ? 1 : -1);
     });
 
     function end(e) {
       if (!active || (e && e.pointerId !== pointerId)) return;
       active = false;
+
       if (!sheet) {
         navigationBusy = false;
         pending = false;
+        pointerId = null;
         return;
       }
-      const commit = progress > .35;
-      const shouldClick = !moved;
-      animateRelease(commit ? 1 : 0, forward ? 1 : -1, commit, shouldClick
-        ? () => goToSpread(B.cur + (forward ? 1 : -1))
-        : null);
+
+      // A tap should use the normal navigation path exactly once. Do not
+      // animate a zero-distance sheet and then dispatch a second click path.
+      if (!moved) {
+        clickSuppressed = true;
+        const target = B.cur + (forward ? 1 : -1);
+        cleanup(true);
+        try { el.releasePointerCapture(pointerId); } catch (err) {}
+        pointerId = null;
+        goToSpread(target);
+        return;
+      }
+
+      const commit = progress > .35 || (progress > .12 && dragVelocity > .32);
+      animateRelease(commit ? 1 : 0, forward ? 1 : -1, commit);
       try { el.releasePointerCapture(pointerId); } catch (err) {}
       pointerId = null;
     }
@@ -995,8 +1048,10 @@
     el.addEventListener("pointercancel", (e) => {
       if (!active) return;
       active = false;
+      clickSuppressed = true;
       if (sheet) animateRelease(0, forward ? 1 : -1, false);
-      else { navigationBusy = false; pending = false; }
+      else { navigationBusy = false; pending = false; pointerId = null; }
+      try { if (pointerId != null) el.releasePointerCapture(pointerId); } catch (err) {}
     });
     el.addEventListener("click", () => {
       if (!clickSuppressed) goToSpread(B.cur + (forward ? 1 : -1));
@@ -1031,12 +1086,10 @@
     const p = .5 - .5 * Math.cos(Math.PI * M.clamp(progress, 0, 1));
     const coverAngle = -180 * p;
     const coverDepth = COVER_FRONT_DEPTH + (COVER_BACK_DEPTH - COVER_FRONT_DEPTH) * p;
-    lid.style.transform =
-      "translateZ(" + coverDepth.toFixed(2) + "px) rotateY(" + coverAngle.toFixed(3) + "deg)";
-    // The desktop closed volume is one page wide; reveal the other leaf with the hinge.
-    spreadEl.style.clipPath = B.single
-      ? ""
-      : "inset(0 0 0 " + (50 * (1 - p)).toFixed(3) + "%)";
+    lid.style.transform = "rotateY(" + coverAngle.toFixed(3) + "deg)";
+    // The turning geometry must never be revealed through a second clip path.
+    // The binder/page boundary owns clipping; the cover simply swings away.
+    spreadEl.style.clipPath = "";
     paintPaperMotion(p);
     const shade = Math.sin(Math.PI * p);
     lidShade.style.opacity = String(Math.min(.5, shade * .58));
