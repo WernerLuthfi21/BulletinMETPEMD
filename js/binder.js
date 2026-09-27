@@ -602,7 +602,9 @@
     const p = M.clamp(progress, 0, 1);
     // Mobile always folds the visible sheet leftward over the left hinge.
     // Desktop keeps the mirrored left/right physical turn.
-    const angle = (B.single ? -180 : (dir > 0 ? -180 : 180)) * p;
+    // Mobile keeps the left hinge, but backward turns use the opposite
+    // 3D rotation path so the sheet folds outward instead of collapsing inward.
+    const angle = (B.single ? (dir > 0 ? -180 : 180) : (dir > 0 ? -180 : 180)) * p;
     const curl = Math.sin(Math.PI * p);
     const lift = curl * (B.single ? 0.9 : 3.0);
     const pitch = (dir > 0 ? -1 : 1) * curl * (B.single ? 0 : 0.55);
