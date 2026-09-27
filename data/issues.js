@@ -15,6 +15,7 @@ window.METP_ISSUES = [
     month: 8,
     year: 2026,
     number: 1,
+    display_page_count: 2,
     title: "Material Goes to Lotte Chemical",
     editor_chief: "M. Fuadi",
     editors: ["Ayu", "Werner"],
