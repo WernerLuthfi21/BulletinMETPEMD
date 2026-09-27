@@ -1151,11 +1151,6 @@
 
       if (frontShade) frontShade.style.opacity = String(Math.min(.34, arc * .34));
       if (lidRevealPage) {
-        const rp = M.clamp((0.70 - eased) / 0.46, 0, 1);
-        const re = rp * rp * (3 - 2 * rp);
-        lidRevealPage.style.opacity = String(re);
-      }
-      if (lidRevealPage) {
         const rp = M.clamp((eased - 0.48) / 0.44, 0, 1);
         const re = rp * rp * (3 - 2 * rp);
         lidRevealPage.style.opacity = String(re);
@@ -1197,6 +1192,7 @@
 
     if (M.reducedMotion()) {
       binderEl.setAttribute("data-state", "closed");
+      if (lidRevealPage) lidRevealPage.style.opacity = "0";
       lid.style.opacity = "1";
       lid.style.transform = "translate3d(0,0,0) rotateY(0deg) rotateX(0deg)";
       return;
@@ -1230,6 +1226,11 @@
       lid.style.setProperty("--lid-light-y", Math.round(12 + arc * 10) + "%");
 
       if (frontShade) frontShade.style.opacity = String(Math.min(.34, arc * .34));
+      if (lidRevealPage) {
+        const rp = M.clamp((0.70 - eased) / 0.46, 0, 1);
+        const re = rp * rp * (3 - 2 * rp);
+        lidRevealPage.style.opacity = String(re);
+      }
       if (shadow) {
         shadow.style.opacity = String(.43 + arc * .12);
         shadow.style.transform =
