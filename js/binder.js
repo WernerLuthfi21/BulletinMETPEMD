@@ -71,7 +71,10 @@
   }
 
   function warmSpread(spread) {
-    return Promise.all((spread || []).map((pg) => preloadPage(pg)));
+    return Promise.all((spread || []).map((pg) => preloadPage(pg))).catch((e) => {
+      console.warn("[METP] spread warm-up failed; page remains interactive", e);
+      return null;
+    });
   }
 
   function preloadImage(src) {
