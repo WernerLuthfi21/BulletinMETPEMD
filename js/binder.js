@@ -588,6 +588,7 @@
     host.appendChild(front);
     host.appendChild(back);
     spreadEl.appendChild(host);
+    binderEl.setAttribute("data-turning", "true");
 
     return { host, front, back, frontShade, backShade };
   }
@@ -740,6 +741,7 @@
         try { onLand(); } catch (e) { console.error("[METP] turn landing failed", e); }
         if (underlay) underlay.remove();
         sheet.host.remove();
+        binderEl.removeAttribute("data-turning");
         slotL.style.visibility = "";
         slotR.style.visibility = "";
         flipping = false;
@@ -812,6 +814,7 @@
     function cleanup(cancelOnly) {
       if (underlay) underlay.remove();
       if (sheet) sheet.host.remove();
+      binderEl.removeAttribute("data-turning");
       slotL.style.visibility = "";
       slotR.style.visibility = "";
       if (cancelOnly) renderSpreadCore();
