@@ -394,7 +394,6 @@ img{max-width:100%}
   position:absolute;inset:0;overflow:hidden;
   background:#faf5e8;
   backface-visibility:hidden;-webkit-backface-visibility:hidden;
-  transform-style:preserve-3d;-webkit-transform-style:preserve-3d;
   border:1px solid rgba(60,45,28,.10);
   box-shadow:0 5px 10px rgba(18,7,3,.14);
 }
@@ -561,7 +560,6 @@ button.key svg,a.key svg{width:17px;height:17px;flex:none}
 .lid-face{
   position:absolute;inset:0;
   backface-visibility:hidden;-webkit-backface-visibility:hidden;
-  transform-style:preserve-3d;-webkit-transform-style:preserve-3d;
   border-radius:3px 9px 9px 3px;overflow:hidden;
 }
 .lid-face.front{
