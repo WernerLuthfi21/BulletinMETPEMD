@@ -647,8 +647,6 @@
     if (B.single) {
       const source = leafNode(slotR);
       if (!source) return Promise.resolve();
-      const currentSpread = B.spreads[B.cur] || [null, null];
-      await hydrateLeafImage(source, pageMeta(currentSpread[1]));
       const destPage = destination.find(Boolean) || null;
       // Mobile is one printed page per physical sheet. The next page is a
       // separate sheet underneath; it must never be mounted on the turning
@@ -676,8 +674,6 @@
       const source = leafNode(slotR);
       if (!source) return Promise.resolve();
 
-      const currentSpread = B.spreads[B.cur] || [null, null];
-      await hydrateLeafImage(source, pageMeta(currentSpread[1]));
       const destinationLeft = destination[0] || null;
       const destinationRight = destination[1] || null;
       const back = destinationLeft
@@ -707,8 +703,6 @@
     const source = leafNode(slotL);
     if (!source) return Promise.resolve();
 
-    const currentSpread = B.spreads[B.cur] || [null, null];
-    await hydrateLeafImage(source, pageMeta(currentSpread[0]));
     const destinationLeft = destination[0] || null;
     const destinationRight = destination[1] || null;
     const back = destinationRight
@@ -795,8 +789,6 @@
       });
       if (target === B.cur || flipping || !B.opened) return;
       await animatePhysicalTurn(dir, target, viaTab);
-      currentSpreadReady = false;
-      currentSpreadReady = await ensureSpreadReady(B.spreads[B.cur]);
       renderMeta();
       renderTabs();
     } catch (err) {
