@@ -136,35 +136,15 @@ img{max-width:100%}
 .binder[data-motion="closing"] .spread{
   opacity:1;visibility:visible;clip-path:none;
 }
-.binder[data-motion="opening"] .slot.left .leaf{
-  transform-origin:right center;
-  animation:metp-page-open-left .94s cubic-bezier(.48,0,.52,1) .08s both;
-}
-.binder[data-motion="opening"] .slot.right .leaf{
-  transform-origin:left center;
-  animation:metp-page-open-right .86s cubic-bezier(.48,0,.52,1) both;
-}
-.binder[data-motion="closing"] .slot.left .leaf{
-  transform-origin:right center;
-  animation:metp-page-open-left .94s cubic-bezier(.48,0,.52,1) .08s reverse both;
-}
-.binder[data-motion="closing"] .slot.right .leaf{
-  transform-origin:left center;
-  animation:metp-page-open-right .86s cubic-bezier(.48,0,.52,1) reverse both;
-}
-@keyframes metp-page-open-left{
-  0%{transform:rotateY(20deg) translateZ(12px);box-shadow:0 12px 18px rgba(20,8,3,.20)}
-  35%{transform:rotateY(-12deg) translateZ(18px)}
-  68%{transform:rotateY(6deg) translateZ(9px)}
-  88%{transform:rotateY(-2deg) translateZ(3px)}
-  100%{transform:none;box-shadow:none}
-}
-@keyframes metp-page-open-right{
-  0%{transform:rotateY(-22deg) translateZ(12px);box-shadow:0 14px 20px rgba(20,8,3,.24)}
-  35%{transform:rotateY(14deg) translateZ(18px)}
-  68%{transform:rotateY(-7deg) translateZ(10px)}
-  88%{transform:rotateY(3deg) translateZ(4px)}
-  100%{transform:none;box-shadow:none}
+/* The first spread's own tilt during opening/closing is now written every
+   animation frame by js/binder.js (setPageOpenPose), driven by the exact
+   same progress value as the cover's rotation (see setCoverPose/animateCover).
+   That keeps the page physically coupled to the cover instead of playing an
+   independently-timed CSS keyframe alongside it. Only the hinge geometry and
+   rendering hints live here. */
+.binder[data-motion="opening"] .slot .leaf,
+.binder[data-motion="closing"] .slot .leaf{
+  will-change:transform;
 }
 .binder[data-motion="opening"] .rings,
 .binder[data-motion="closing"] .rings,
@@ -212,6 +192,11 @@ img{max-width:100%}
     );
   box-shadow:0 3px 5px rgba(20,8,3,.28);
 }
+.slot .leaf{
+  backface-visibility:hidden;-webkit-backface-visibility:hidden;
+}
+.slot.left .leaf{transform-origin:right center}
+.slot.right .leaf{transform-origin:left center}
 .slot.left{
   left:0;
 }
@@ -934,9 +919,44 @@ dialog::backdrop{background:rgba(18,8,3,.78);backdrop-filter:blur(2px)}
 .lid-mini.tag .tag-globe{width:16px;height:16px;flex:none;color:var(--blue)}
 .lid-mini.tag span{font:600 9px/1.2 var(--cond);letter-spacing:.05em}
 .lid-label{left:11%;right:11%;bottom:29%;padding:0;background:transparent;border:0;box-shadow:none;transform:rotate(-1deg);display:none}
+/* Mobile/single cover: the cover is noticeably narrower and taller (relative
+   to its own width) than the desktop two-cover layout, so the desktop
+   percentages just move fixed-px text/padding closer together without
+   shrinking it — that's what caused the overlaps. Below, every element gets
+   its own top-anchored band (so vertical order is unambiguous) and its
+   font-size/padding scale with --lw via clamp(), so they shrink together
+   with the cover instead of staying desktop-sized on a much narrower box. */
 @media (max-width:900px){
-  .lid-gear{width:14%}.lid-open-note{font-size:10px;padding:8px 10px}.lid-open{top:2.5%;right:3%;width:min(44%,172px);height:48px}.lid-sticker{top:24%;width:90%}.lid-note{font-size:13px}.lid-label{display:none}
-  .lid-stamp{width:22%;right:9%}.lid-photo{width:50%;left:44%;bottom:20%}
+  .lid-label{display:none}
+
+  .lid-gear{left:5%;top:3%;width:15%}
+  .lid-open-note{
+    right:5%;top:3%;
+    font-size:clamp(8px,calc(var(--lw)*.030),10.5px);
+    padding:clamp(6px,calc(var(--lw)*.020),8px) clamp(7px,calc(var(--lw)*.028),10px) clamp(4px,calc(var(--lw)*.016),6px);
+  }
+  .lid-open-note span{font-size:clamp(10px,calc(var(--lw)*.040),14px);margin-left:6px}
+  .lid-open{top:2.5%;right:3%;width:min(44%,172px);height:48px}
+
+  .lid-sticker{left:6%;top:16%;width:88%}
+
+  .lid-note{
+    font-size:clamp(11px,calc(var(--lw)*.042),14px);
+    padding:clamp(6px,calc(var(--lw)*.024),9px) clamp(9px,calc(var(--lw)*.034),12px);
+  }
+  .lid-note-a{left:6%;top:38%;bottom:auto;right:auto;max-width:46%}
+  .lid-note.ribbon{left:auto;right:5%;bottom:19%;top:auto;max-width:46%}
+
+  .lid-stamp{right:7%;top:38%;width:22%}
+
+  .lid-photo{left:6%;top:55%;bottom:auto;width:56%}
+
+  .lid-mini.tag{
+    left:6%;bottom:4%;
+    padding:clamp(5px,calc(var(--lw)*.020),7px) clamp(8px,calc(var(--lw)*.030),12px) clamp(5px,calc(var(--lw)*.020),7px) clamp(6px,calc(var(--lw)*.024),9px);
+  }
+  .lid-mini.tag .tag-globe{width:clamp(12px,calc(var(--lw)*.045),16px);height:clamp(12px,calc(var(--lw)*.045),16px)}
+  .lid-mini.tag span{font-size:clamp(7.5px,calc(var(--lw)*.029),9px)}
 }
 
 

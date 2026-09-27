@@ -1022,6 +1022,39 @@
     return e;
   }
 
+  // The first spread is a separate physical sheet lying just behind the
+  // cover, sharing the same hinge line (see .slot.left/.slot.right
+  // transform-origin in site.css). It is driven from the SAME eased
+  // progress value `e` that setCoverPose just computed for the lid, in the
+  // same animation frame, rather than a separately-timed CSS animation:
+  // that is what keeps it visually attached to the cover instead of
+  // looking like an unrelated visibility toggle. PAGE_LAG makes the sheet
+  // start following slightly after the cover (a thinner, lighter layer
+  // stacked underneath), and it always finishes flat exactly when the
+  // cover finishes its own motion, because both read off the same `e`.
+  const PAGE_TILT_DEG = 58;
+  const PAGE_LAG = 0.14;
+  function setPageOpenPose(e, opening) {
+    const p2 = M.clamp((e - PAGE_LAG) / (1 - PAGE_LAG), 0, 1);
+    const pe = .5 - .5 * Math.cos(Math.PI * p2);
+    const amount = opening ? (1 - pe) : pe;
+    const lift = Math.sin(Math.PI * pe) * 4;
+    const leftLeaf = slotL.querySelector(".leaf");
+    const rightLeaf = slotR.querySelector(".leaf");
+    if (leftLeaf) {
+      leftLeaf.style.transform = amount > 0.001
+        ? "translateZ(" + lift.toFixed(2) + "px) rotateY(" + (PAGE_TILT_DEG * amount).toFixed(3) + "deg)"
+        : "";
+      leftLeaf.style.filter = amount > 0.001 ? "brightness(" + (1 - amount * .12).toFixed(3) + ")" : "";
+    }
+    if (rightLeaf) {
+      rightLeaf.style.transform = amount > 0.001
+        ? "translateZ(" + lift.toFixed(2) + "px) rotateY(" + (-PAGE_TILT_DEG * amount).toFixed(3) + "deg)"
+        : "";
+      rightLeaf.style.filter = amount > 0.001 ? "brightness(" + (1 - amount * .12).toFixed(3) + ")" : "";
+    }
+  }
+
   function animateCover(opening, fromX, toX) {
     return new Promise((resolve) => {
       const shade = lid.querySelector(".front .shade");
@@ -1030,6 +1063,7 @@
         if (start == null) start = ts;
         const p = M.clamp((ts - start) / OPEN_MS, 0, 1);
         const e = setCoverPose(p, opening);
+        setPageOpenPose(e, opening);
         setBinderX(fromX + (toX - fromX) * e);
         paintPaperMotion(p);
         if (shade) shade.style.opacity = String(Math.min(.50, Math.sin(Math.PI * e) * .58));
@@ -1039,6 +1073,7 @@
 
       if (M.reducedMotion()) {
         setCoverPose(1, opening);
+        setPageOpenPose(1, opening);
         setBinderX(toX);
         paintPaperMotion(0);
         if (shade) shade.style.opacity = "0";
@@ -1077,6 +1112,7 @@
     lid.style.pointerEvents = "none";
     setCoverHinge();
     setCoverPose(0, true);
+    setPageOpenPose(0, true);
     paintPaperMotion(0);
 
     const ready = currentSpreadReady ? Promise.resolve(true) : waitForCurrentSpread();
@@ -1098,6 +1134,7 @@
       lid.style.visibility = "hidden";
       lid.style.pointerEvents = "none";
       setCoverPose(1, true);
+      setPageOpenPose(1, true);
       lid.style.transform = "rotateY(-180deg)";
       paintPaperMotion(0);
       coverMotion = false;
@@ -1107,6 +1144,7 @@
       binderEl.setAttribute("data-state", "closed");
       binderEl.removeAttribute("data-motion");
       setCoverPose(0, true);
+      setPageOpenPose(0, true);
       lid.style.opacity = "1";
       lid.style.visibility = "visible";
       lid.style.pointerEvents = "";
@@ -1138,6 +1176,7 @@
     lid.style.pointerEvents = "none";
     setCoverHinge();
     setCoverPose(0, false);
+    setPageOpenPose(0, false);
     paintPaperMotion(0);
 
     animateCover(false, 0, closedX).then(() => {
@@ -1146,6 +1185,7 @@
         binderEl.removeAttribute("data-motion");
         setBinderX(closedX);
         setCoverPose(1, false);
+        setPageOpenPose(1, false);
         lid.style.transform = "rotateY(0deg)";
         lid.style.opacity = "1";
         lid.style.visibility = "visible";
@@ -1159,6 +1199,7 @@
       binderEl.setAttribute("data-state", "open");
       binderEl.removeAttribute("data-motion");
       setCoverPose(1, true);
+      setPageOpenPose(1, true);
       lid.style.opacity = "0";
       lid.style.visibility = "hidden";
       lid.style.pointerEvents = "none";
