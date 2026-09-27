@@ -1088,16 +1088,34 @@
     if (M.reducedMotion()) { lid.style.opacity = "0"; lid.style.pointerEvents = "none"; return; }
     lid.style.opacity = "1";
     lid.style.transformOrigin = "left center";
-    const dur = 900;
+    const frontShade = lid.querySelector(".front .shade");
+    const shadow = binderEl.querySelector(".b-shadow");
+    const dur = 1080;
     let start;
     function frame(ts) {
       if (start == null) start = ts;
       const t = M.clamp((ts - start) / dur, 0, 1);
-      const eased = 1 - Math.pow(1 - t, 3);
-      lid.style.transform = "rotateY(" + (-eased * 178) + "deg)";
-      lid.querySelector(".front .shade").style.opacity = M.clamp(eased * 1.6, 0, 1) * (1 - eased);
+      const eased = 1 - Math.pow(1 - t, 4);
+      const arc = Math.sin(Math.PI * eased);
+      const lift = arc * 5;
+      const pitch = -arc * 0.8;
+      lid.style.transform =
+        "translate3d(0," + (-lift * 0.18).toFixed(2) + "px," + lift.toFixed(2) + "px) " +
+        "rotateY(" + (-eased * 178).toFixed(3) + "deg) " +
+        "rotateX(" + pitch.toFixed(3) + "deg)";
+      lid.style.setProperty("--lid-light-x", Math.round(22 + eased * 18) + "%");
+      lid.style.setProperty("--lid-light-y", Math.round(12 + arc * 10) + "%");
+      if (frontShade) frontShade.style.opacity = String(Math.min(.34, arc * .34));
+      if (shadow) {
+        shadow.style.opacity = String(.55 - arc * .12);
+        shadow.style.transform = "scale(" + (1 - arc * .018).toFixed(3) + "," + (1 - arc * .04).toFixed(3) + ")";
+      }
       if (t < 1) requestAnimationFrame(frame);
-      else { lid.style.opacity = "0"; lid.style.pointerEvents = "none"; }
+      else {
+        lid.style.opacity = "0";
+        lid.style.pointerEvents = "none";
+        lid.style.transform = "translate3d(0,0,0) rotateY(-178deg) rotateX(0deg)";
+      }
     }
     requestAnimationFrame(frame);
   }
@@ -1109,16 +1127,33 @@
     M.sound && M.sound.close();
     if (M.reducedMotion()) { binderEl.setAttribute("data-state", "closed"); lid.style.opacity = "1"; lid.style.transform = "rotateY(0deg)"; return; }
     lid.style.opacity = "1";
-    const dur = 750;
+    const frontShade = lid.querySelector(".front .shade");
+    const shadow = binderEl.querySelector(".b-shadow");
+    const dur = 930;
     let start;
     function frame(ts) {
       if (start == null) start = ts;
       const t = M.clamp((ts - start) / dur, 0, 1);
       const eased = t * t * (3 - 2 * t);
-      lid.style.transform = "rotateY(" + (-178 + eased * 178) + "deg)";
-      lid.querySelector(".front .shade").style.opacity = M.clamp((1 - eased) * 1.6, 0, 1) * eased;
+      const arc = Math.sin(Math.PI * (1 - eased));
+      const lift = arc * 5;
+      const pitch = -arc * 0.8;
+      lid.style.transform =
+        "translate3d(0," + (-lift * 0.18).toFixed(2) + "px," + lift.toFixed(2) + "px) " +
+        "rotateY(" + (-178 + eased * 178).toFixed(3) + "deg) " +
+        "rotateX(" + pitch.toFixed(3) + "deg)";
+      lid.style.setProperty("--lid-light-x", Math.round(40 - eased * 18) + "%");
+      lid.style.setProperty("--lid-light-y", Math.round(12 + arc * 10) + "%");
+      if (frontShade) frontShade.style.opacity = String(Math.min(.34, arc * .34));
+      if (shadow) {
+        shadow.style.opacity = String(.43 + arc * .12);
+        shadow.style.transform = "scale(" + (1 - arc * .018).toFixed(3) + "," + (1 - arc * .04).toFixed(3) + ")";
+      }
       if (t < 1) requestAnimationFrame(frame);
-      else binderEl.setAttribute("data-state", "closed");
+      else {
+        binderEl.setAttribute("data-state", "closed");
+        lid.style.transform = "translate3d(0,0,0) rotateY(0deg) rotateX(0deg)";
+      }
     }
     requestAnimationFrame(frame);
   }
