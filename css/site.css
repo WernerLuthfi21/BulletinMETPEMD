@@ -434,8 +434,7 @@ img{max-width:100%}
   /* Mobile uses one printed page per physical sheet. Page 2 is a separate
      underlay, so the turning sheet must not show a second page on its back. */
   .binder[data-mode="single"] .physical-turn-face.back{visibility:hidden}
-  .binder[data-mode="single"] .lid-face.back{background:linear-gradient(135deg,var(--red-600),var(--red-800) 70%,var(--red-900));background-blend-mode:normal}
-  .binder[data-mode="single"] .lid-sheet{display:none}
+  .binder[data-mode="single"] .lid-reveal-page{display:none!important}
 }
 
 /* ---------- 7. rings, sticker, control bar, index tabs ---------- */
@@ -569,32 +568,35 @@ button.key svg,a.key svg{width:17px;height:17px;flex:none}
     10px 14px 18px rgba(20,7,3,.18);
   transition:box-shadow .18s ease;
 }
-.lid-face.back{
-  transform:rotateY(180deg);border-radius:9px 3px 3px 9px;
-  background:#f7f0e3;
-  box-shadow:inset 2px 2px 0 rgba(255,255,255,.72),inset -3px -3px 0 rgba(53,34,19,.20);
-}
-.lid-back-page{
-  position:absolute!important;inset:7px 7px 7px 8px!important;
-  z-index:1!important;overflow:hidden!important;
-  pointer-events:none!important;
+/* One and only one cover-to-Page #1 reveal plane.
+   It is a child of the same .lid transform, so the hinge and rotation are
+   physically identical to the cover. scaleX(-1) cancels the Y-rotation
+   mirroring when the cover reaches the open side. */
+.lid-reveal-page{
+  position:absolute;inset:7px 7px 7px 8px;z-index:30;
+  overflow:hidden;pointer-events:none;opacity:0;
   border:1px solid rgba(77,58,37,.18);
   border-radius:2px 4px 4px 2px;
   background:#faf5e8;
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.42),2px 4px 8px rgba(22,9,4,.24);
+  transform:scaleX(-1);
+  transform-origin:50% 50%;
+  backface-visibility:visible;-webkit-backface-visibility:visible;
+  will-change:opacity,transform;
+}
+.lid-reveal-inner{
+  position:absolute!important;inset:0!important;
+  width:100%!important;height:100%!important;
   transform:none!important;
+  border:0!important;border-radius:0!important;
+  box-shadow:none!important;background:transparent!important;
 }
-.lid-face.back > .lid-back-page{
-  transform:none!important;
-}
-.lid-face.back .lid-back-page .leaf-open{
-  display:none!important;
-}
-.lid-face.back .lid-back-page::before{
+.lid-reveal-inner .leaf-open{display:none!important}
+.lid-reveal-page::before{
   content:"";position:absolute;inset:0;z-index:5;pointer-events:none;
   background:
-    linear-gradient(90deg,rgba(30,16,8,.16),transparent 8% 82%,rgba(0,0,0,.06)),
-    linear-gradient(180deg,rgba(255,255,255,.20),transparent 16%,rgba(0,0,0,.04));
+    linear-gradient(90deg,rgba(30,16,8,.13),transparent 8% 82%,rgba(0,0,0,.05)),
+    linear-gradient(180deg,rgba(255,255,255,.18),transparent 16%,rgba(0,0,0,.03));
 }
 
 .lid-face .shade{
