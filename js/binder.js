@@ -563,8 +563,17 @@
     const half = B.single ? rect.width : rect.width / 2;
     const isForward = dir > 0;
     host.style.width = (B.single ? rect.width : half) + "px";
-    host.style.left = (B.single ? 0 : (isForward ? half : 0)) + "px";
-    host.style.transformOrigin = isForward ? "left center" : "right center";
+    // Mobile is a single visible sheet. Both directions use the same
+    // bound edge (left/hinge) and the same physical swing over the hinge.
+    // The destination lives on the back face, so reversing direction does
+    // not require moving the hinge to the opposite edge.
+    if (B.single) {
+      host.style.left = "0px";
+      host.style.transformOrigin = "left center";
+    } else {
+      host.style.left = (isForward ? half : 0) + "px";
+      host.style.transformOrigin = isForward ? "left center" : "right center";
+    }
 
     const front = M.el("div", { class: "physical-turn-face front" });
     const back = M.el("div", { class: "physical-turn-face back" });
