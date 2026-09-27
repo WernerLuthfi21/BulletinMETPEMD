@@ -213,7 +213,9 @@ img{max-width:100%}
 .binder[data-cover-opening="true"] .hint,
 .binder[data-cover-opening="true"] .sticker,
 .binder[data-cover-opening="true"] .peel,
-.binder[data-cover-opening="true"] .b-shadow{
+.binder[data-cover-opening="true"] .b-shadow,
+.binder[data-cover-opening="true"] .b-crease,
+.binder[data-cover-opening="true"] .spread-page-tags{
   opacity:0!important;visibility:hidden!important;pointer-events:none!important;
 }
 .binder[data-state="closed"] .b-shadow{
