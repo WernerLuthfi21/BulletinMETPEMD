@@ -1,13 +1,13 @@
 [
   {
-    "id": "Mechanical Room Tone",
-    "label": "Mechanical Room Tone",
-    "src": "assets/audio/Mechanical Room Tone.mp3"
-  },
-  {
     "id": "Fantasia Asmara",
     "label": "Fantasia Asmara",
     "src": "assets/audio/Fantasia Asmara.mp3"
+  },
+  {
+    "id": "Mechanical Room Tone",
+    "label": "Mechanical Room Tone",
+    "src": "assets/audio/Mechanical Room Tone.mp3"
   },
   {
     "id": "Read",
@@ -31,7 +31,7 @@
   },
   {
     "id": "kicau-mania-ndarboy-genk-x-banditoz",
-    "label": "Kicau Mania - Ndarboy Genk x Banditoz",
+    "label": "Kicau Mania Ndarboy Genk x Banditoz",
     "src": "assets/audio/kicau-mania-ndarboy-genk-x-banditoz.mp3"
   },
   {
