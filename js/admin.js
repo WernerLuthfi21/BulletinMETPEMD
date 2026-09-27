@@ -175,6 +175,7 @@
     $("#fEditorChief").value = row ? row.editor_chief || "" : "";
     $("#fEditors").value = row ? (row.editors || []).join(", ") : "";
     $("#fContributors").value = row ? (row.contributors || []).join(", ") : "";
+    $("#fDisplayPageCount").value = String(row && row.display_page_count ? row.display_page_count : 2);
     $("#fPublished").checked = row ? row.status === "published" : false;
     $("#maxMbLabel").textContent = cfg.maxUploadMB || 25;
     renderHighlights(row && row.highlights ? row.highlights : []);
@@ -317,6 +318,7 @@
       editor_chief: $("#fEditorChief").value.trim(),
       editors: splitList($("#fEditors").value),
       contributors: splitList($("#fContributors").value),
+      display_page_count: Math.max(1, Math.min(2, +$("#fDisplayPageCount").value || 2)),
       status: $("#fPublished").checked ? "published" : "draft",
       highlights: collectHighlights()
     };
