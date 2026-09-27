@@ -19,9 +19,10 @@
   function measureFitZoom() {
     if (!baseWidth) return 1;
     const available = Math.max(240, body.clientWidth - 28);
-    // Start at a readable 1:1 scale on desktop, but fit the complete page
-    // inside the reader on phones instead of opening at the raw 792px width.
-    return M.clamp(Math.min(1, available / baseWidth), 0.35, 1);
+    // Open desktop pages slightly below native 1:1 so the full bulletin
+    // sits comfortably inside the reader instead of feeling overly zoomed.
+    // Phones remain constrained by the available viewport width.
+    return M.clamp(Math.min(0.84, available / baseWidth), 0.35, 0.84);
   }
 
   function resetViewport() {
