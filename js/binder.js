@@ -1087,10 +1087,9 @@
   // a paper-and-binding relationship instead of exposing a mirrored cover.
   function syncLidBackPage() {
     if (B.single) return;
-    const face = lid.querySelector(".lid-face.back");
-    if (!face) return;
-    const old = face.querySelector(".lid-back-page");
-    if (old) old.remove();
+    const sheet = document.getElementById("lidSheet");
+    if (!sheet) return;
+    sheet.textContent = "";
 
     const spread = B.spreads[B.cur] || [];
     const current = currentPageOf(spread);
@@ -1099,9 +1098,33 @@
       : spread.find((p) => p && !p.placeholder);
     if (!first) return;
 
+    // Prefer the exact leaf already rendered in the open spread. This avoids a
+    // second signed-URL request and, more importantly, puts the SAME decoded
+    // photograph/text surface on the cover sheet from animation frame 0.
+    let sourceLeaf = null;
+    if (spread[0] && samePage(spread[0], first)) sourceLeaf = slotL.firstElementChild;
+    else if (spread[1] && samePage(spread[1], first)) sourceLeaf = slotR.firstElementChild;
+
+    if (sourceLeaf) {
+      const clone = sourceLeaf.cloneNode(true);
+      clone.classList.add("lid-bound-sheet-leaf");
+      clone.querySelectorAll(".leaf-open").forEach((el) => el.remove());
+      sheet.appendChild(clone);
+      // If the visible leaf was still loading, hydrate the cover copy in the
+      // background; the cover motion itself never waits on the network.
+      if (!clone.querySelector(".leaf-img") && !first.issue.spread) {
+        hydrateLeafImage(clone, pageMeta(first)).catch((e) => {
+          console.warn("[METP] cover sheet hydration failed", e);
+        });
+      }
+      return;
+    }
+
+    // Fallback for a freshly switched model where no visible leaf exists yet.
     const page = buildReadyLeafContent(pageMeta(first), "right");
-    page.classList.add("lid-back-page");
-    face.insertBefore(page, face.firstChild);
+    page.classList.add("lid-bound-sheet-leaf");
+    page.querySelectorAll(".leaf-open").forEach((el) => el.remove());
+    sheet.appendChild(page);
   }
 
   function openBinder() {
