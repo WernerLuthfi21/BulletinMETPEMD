@@ -22,7 +22,7 @@
     // Open desktop pages slightly below native 1:1 so the full bulletin
     // sits comfortably inside the reader instead of feeling overly zoomed.
     // Phones remain constrained by the available viewport width.
-    return M.clamp(Math.min(0.84, available / baseWidth), 0.35, 0.84);
+    return M.clamp(Math.min(0.68, available / baseWidth), 0.35, 0.68);
   }
 
   function resetViewport() {
