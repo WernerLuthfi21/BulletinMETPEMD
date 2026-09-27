@@ -34,7 +34,8 @@
     cur: 0,
     opened: false,
     single: false,
-    selectedIssueId: null
+    selectedIssueId: null,
+    selectedPageKey: null
   });
 
   // Page assets are warmed before a turn so the real leaf is never replaced
@@ -153,6 +154,10 @@
   function currentPageOf(spread) {
     const real = (spread || []).filter((p) => p && !p.placeholder);
     if (!real.length) return null;
+    if (B.selectedPageKey) {
+      const active = real.find((p) => pageKey(p) === B.selectedPageKey);
+      if (active) return active;
+    }
     return real.find((p) => p.issue.id === B.selectedIssueId) || real[0];
   }
 
@@ -265,7 +270,11 @@
   function bindReaderButton(button, meta) {
     if (button.dataset.bound) return;
     button.dataset.bound = "1";
-    button.addEventListener("click", () => window.METP.reader.open(meta.issue, meta.pageIndex));
+    button.addEventListener("click", () => {
+      B.selectedPageKey = pageKey(meta);
+      window.METP.reader.open(meta.issue, meta.pageIndex);
+      renderMeta();
+    });
     button.setAttribute("aria-label", "Open " + meta.issue.label + ", page " + (meta.pageIndex + 1) + " in the reader");
   }
 
@@ -390,13 +399,13 @@
 
   function buildReadyLeafContent(meta, side) {
     const leaf = buildLeafContent(meta, side);
-    if (!meta || meta.placeholder || (meta.issue && meta.issue.spread)) return Promise.resolve(leaf);
+    if (!meta || meta.placeholder || (meta.issue && meta.issue.spread)) return leaf;
     if (!leaf.querySelector(".leaf-img")) {
       hydrateLeafImage(leaf, meta).catch((e) => {
         console.warn("[METP] destination page hydration failed; leaving retry UI visible", e);
       });
     }
-    return Promise.resolve(leaf);
+    return leaf;
   }
 
   function buildPlaceholder(meta) {
@@ -652,8 +661,8 @@
       // separate sheet underneath; it must never be mounted on the turning
       // sheet's back face, otherwise page 2 looks glued to page 1.
       const underlayNode = destPage
-        ? await buildReadyLeafContent(pageMeta(destPage), "right")
-        : await buildReadyLeafContent(null, "right");
+        ? buildReadyLeafContent(pageMeta(destPage), "right")
+        : buildReadyLeafContent(null, "right");
       const under = makeTurnUnderlay(underlayNode, 0, rect.width);
       const sheet = makeTurnSheet(source, null, dir);
       slotR.style.visibility = "hidden";
@@ -677,12 +686,12 @@
       const destinationLeft = destination[0] || null;
       const destinationRight = destination[1] || null;
       const back = destinationLeft
-        ? await buildReadyLeafContent(pageMeta(destinationLeft), "left")
-        : await buildReadyLeafContent(null, "left");
+        ? buildReadyLeafContent(pageMeta(destinationLeft), "left")
+        : buildReadyLeafContent(null, "left");
       const under = makeTurnUnderlay(
         destinationRight
-          ? await buildReadyLeafContent(pageMeta(destinationRight), "right")
-          : await buildReadyLeafContent(null, "right"),
+          ? buildReadyLeafContent(pageMeta(destinationRight), "right")
+          : buildReadyLeafContent(null, "right"),
         half, half
       );
       const sheet = makeTurnSheet(source, back, dir);
@@ -706,12 +715,12 @@
     const destinationLeft = destination[0] || null;
     const destinationRight = destination[1] || null;
     const back = destinationRight
-      ? await buildReadyLeafContent(pageMeta(destinationRight), "right")
-      : await buildReadyLeafContent(null, "right");
+      ? buildReadyLeafContent(pageMeta(destinationRight), "right")
+      : buildReadyLeafContent(null, "right");
     const under = makeTurnUnderlay(
       destinationLeft
-        ? await buildReadyLeafContent(pageMeta(destinationLeft), "left")
-        : await buildReadyLeafContent(null, "left"),
+        ? buildReadyLeafContent(pageMeta(destinationLeft), "left")
+        : buildReadyLeafContent(null, "left"),
       0, half
     );
     const sheet = makeTurnSheet(source, back, dir);
@@ -842,18 +851,9 @@
       if (!B.opened || target < 0 || target >= B.spreads.length || flipping || navigationBusy ) return false;
 
       navigationBusy = true;
-      let ready;
-      try {
-        ready = await ensureSpreadReady(B.spreads[target]);
-      } catch (error) {
-        navigationBusy = false;
-        throw error;
-      }
-      if (!ready) {
-        renderSpreadCore();
-        navigationBusy = false;
-        return false;
-      }
+      ensureSpreadReady(B.spreads[target]).catch((e) => {
+        console.warn("[METP] drag destination warm-up failed; continuing with live loader", e);
+      });
       if (!active) { navigationBusy = false; return false; }
 
       const destination = B.spreads[target] || [];
@@ -865,14 +865,11 @@
         const source = leafNode(slotR);
         if (!source) { navigationBusy = false; return false; }
         const dest = destination.find(Boolean) || null;
-        const currentSpread = B.spreads[B.cur] || [null, null];
-        await hydrateLeafImage(source, pageMeta(currentSpread[1]));
-        if (!active) { navigationBusy = false; return false; }
         // Mobile is one printed page per physical sheet. Prepare page 2 as
         // a separate underlay, never as the back face of page 1.
         const underlayNode = dest
-          ? await buildReadyLeafContent(pageMeta(dest), "right")
-          : await buildReadyLeafContent(null, "right");
+          ? buildReadyLeafContent(pageMeta(dest), "right")
+          : buildReadyLeafContent(null, "right");
         if (!active) { navigationBusy = false; return false; }
         underlay = makeTurnUnderlay(underlayNode, 0, rect.width);
         if (!active) { underlay.remove(); navigationBusy = false; return false; }
@@ -881,15 +878,12 @@
       } else if (forward) {
         const source = leafNode(slotR);
         if (!source) { navigationBusy = false; return false; }
-        const currentSpread = B.spreads[B.cur] || [null, null];
-        await hydrateLeafImage(source, pageMeta(currentSpread[1]));
-        if (!active) { navigationBusy = false; return false; }
         const back = destination[0]
-          ? await buildReadyLeafContent(pageMeta(destination[0]), "left")
-          : await buildReadyLeafContent(null, "left");
+          ? buildReadyLeafContent(pageMeta(destination[0]), "left")
+          : buildReadyLeafContent(null, "left");
         const underlayNode = destination[1]
-          ? await buildReadyLeafContent(pageMeta(destination[1]), "right")
-          : await buildReadyLeafContent(null, "right");
+          ? buildReadyLeafContent(pageMeta(destination[1]), "right")
+          : buildReadyLeafContent(null, "right");
         if (!active) { navigationBusy = false; return false; }
         underlay = makeTurnUnderlay(underlayNode, half, half);
         if (!active) { underlay.remove(); navigationBusy = false; return false; }
@@ -898,15 +892,12 @@
       } else {
         const source = leafNode(slotL);
         if (!source) { navigationBusy = false; return false; }
-        const currentSpread = B.spreads[B.cur] || [null, null];
-        await hydrateLeafImage(source, pageMeta(currentSpread[0]));
-        if (!active) { navigationBusy = false; return false; }
         const back = destination[1]
-          ? await buildReadyLeafContent(pageMeta(destination[1]), "right")
-          : await buildReadyLeafContent(null, "right");
+          ? buildReadyLeafContent(pageMeta(destination[1]), "right")
+          : buildReadyLeafContent(null, "right");
         const underlayNode = destination[0]
-          ? await buildReadyLeafContent(pageMeta(destination[0]), "left")
-          : await buildReadyLeafContent(null, "left");
+          ? buildReadyLeafContent(pageMeta(destination[0]), "left")
+          : buildReadyLeafContent(null, "left");
         if (!active) { navigationBusy = false; return false; }
         underlay = makeTurnUnderlay(underlayNode, 0, half);
         if (!active) { underlay.remove(); navigationBusy = false; return false; }
