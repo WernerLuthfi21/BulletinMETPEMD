@@ -50,6 +50,7 @@
   let session = null;
   let isAdmin = false;
   let issues = [];
+  let issueById = new Map();
   let currentIssueId = null; // null while creating
   let commentFilter = "pending";
 
@@ -123,6 +124,7 @@
     }
     if (res.error) { toast("Couldn’t load issues: " + res.error.message, true); return; }
     issues = res.data || [];
+    issueById = new Map(issues.map((row) => [row.id, row]));
     renderIssues();
   }
 
@@ -139,7 +141,7 @@
       tr.appendChild(el("td", { text: displayed === 2 ? "2 · #1 + #2" : "1 · #1" }));
       tr.appendChild(el("td", { text: row.published_at ? new Date(row.published_at).toLocaleDateString() : "\u2014" }));
       const actions = el("div", { class: "row-actions" });
-      const editBtn = el("button", { class: "btn sm", type: "button", text: "Edit" });
+      const editBtn = el("button", { class: "btn sm", type: "button", text: "Edit", "data-edit-issue": row.id });
       editBtn.addEventListener("click", () => openIssueDialog(row));
       const toggleBtn = el("button", { class: "btn sm", type: "button", text: row.status === "published" ? "Unpublish" : "Publish" });
       toggleBtn.addEventListener("click", () => togglePublish(row));
@@ -150,7 +152,14 @@
     });
   }
 
-  async function togglePublish(row) {
+  $("#issuesBody").addEventListener("click", (e) => {
+    const btn = e.target.closest && e.target.closest("[data-edit-issue]");
+    if (!btn) return;
+    const row = issueById.get(btn.getAttribute("data-edit-issue"));
+    if (row) openIssueDialog(row);
+  });
+
+    async function togglePublish(row) {
     const next = row.status === "published" ? "draft" : "published";
     const patch = { status: next };
     if (next === "published" && !row.published_at) patch.published_at = new Date().toISOString();
@@ -186,9 +195,19 @@
     renderHighlights(row && row.highlights ? row.highlights : []);
     renderPageUploadZones(row);
     syncPageUploadVisibility();
-    $("#issueDialog").showModal();
+    const dialog = $("#issueDialog");
+    if (dialog) {
+      if (dialog.open && typeof dialog.close === "function") dialog.close();
+      if (typeof dialog.showModal === "function") dialog.showModal();
+      else dialog.setAttribute("open", "");
+    }
   }
-  function closeIssueDialog() { $("#issueDialog").close(); }
+  function closeIssueDialog() {
+    const dialog = $("#issueDialog");
+    if (!dialog) return;
+    if (typeof dialog.close === "function" && dialog.open) dialog.close();
+    else dialog.removeAttribute("open");
+  }
   $("#issueCancel").addEventListener("click", closeIssueDialog);
   $("#issueDialogClose").addEventListener("click", closeIssueDialog);
   $("#issueDialog").addEventListener("click", (e) => { if (e.target === $("#issueDialog")) closeIssueDialog(); });
@@ -246,6 +265,7 @@
   function renderPageUploadZones(row) {
     [1, 2].forEach((page) => {
       const els = pageEls(page);
+      if (!els.zone) return;
       const existing = issuePage(row, page);
       const legacy = page === 1 && !existing && row && row.file_path
         ? { file_path: row.file_path, file_type: row.file_type }
@@ -266,15 +286,19 @@
       els.msg.textContent = "";
       els.msg.className = "msg";
     });
-    $$(".maxMbLabel").forEach((n) => (n.textContent = cfg.maxUploadMB || 50));
+    $(".maxMbLabel").forEach((n) => (n.textContent = cfg.maxUploadMB || 50));
   }
 
   function syncPageUploadVisibility() {
-    $("#pageUploadSlot2").hidden = +$("#fDisplayPageCount").value !== 2;
+    const selector = $("#fDisplayPageCount");
+    const slot2 = $("#pageUploadSlot2");
+    if (!selector || !slot2) return;
+    slot2.hidden = +selector.value !== 2;
   }
 
   [1, 2].forEach((page) => {
     const els = pageEls(page);
+    if (!els.zone || !els.input) return;
     els.zone.addEventListener("click", () => els.input.click());
     els.zone.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); els.input.click(); }
@@ -294,7 +318,7 @@
       els.input.value = "";
     });
   });
-  $("#fDisplayPageCount").addEventListener("change", syncPageUploadVisibility);
+  if ($("#fDisplayPageCount")) $("#fDisplayPageCount").addEventListener("change", syncPageUploadVisibility);
 
   function extType(name) {
     const ext = (name.split(".").pop() || "").toLowerCase();
