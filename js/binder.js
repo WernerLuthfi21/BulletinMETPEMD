@@ -634,12 +634,14 @@
       const currentSpread = B.spreads[B.cur] || [null, null];
       await hydrateLeafImage(source, pageMeta(currentSpread[1]));
       const destPage = destination.find(Boolean) || null;
-      const back = destPage
+      // Mobile is one printed page per physical sheet. The next page is a
+      // separate sheet underneath; it must never be mounted on the turning
+      // sheet's back face, otherwise page 2 looks glued to page 1.
+      const underlayNode = destPage
         ? await buildReadyLeafContent(pageMeta(destPage), "right")
         : await buildReadyLeafContent(null, "right");
-      // Mobile is a single physical sheet. The destination belongs on the
-      // sheet's back face; do not create a second visible underlay/page.
-      const sheet = makeTurnSheet(source, back, dir);
+      const under = makeTurnUnderlay(underlayNode, 0, rect.width);
+      const sheet = makeTurnSheet(source, null, dir);
       slotR.style.visibility = "hidden";
       return runPhysicalTurn(sheet, dir, () => {
         B.cur = target;
@@ -857,13 +859,15 @@
         const currentSpread = B.spreads[B.cur] || [null, null];
         await hydrateLeafImage(source, pageMeta(currentSpread[1]));
         if (!active) { navigationBusy = false; return false; }
-        // Mobile has one physical sheet, so the destination is prepared
-        // once and placed directly on that sheet's back face.
-        const back = dest
+        // Mobile is one printed page per physical sheet. Prepare page 2 as
+        // a separate underlay, never as the back face of page 1.
+        const underlayNode = dest
           ? await buildReadyLeafContent(pageMeta(dest), "right")
           : await buildReadyLeafContent(null, "right");
         if (!active) { navigationBusy = false; return false; }
-        sheet = makeTurnSheet(source, back, forward ? 1 : -1);
+        underlay = makeTurnUnderlay(underlayNode, 0, rect.width);
+        if (!active) { underlay.remove(); navigationBusy = false; return false; }
+        sheet = makeTurnSheet(source, null, forward ? 1 : -1);
         slotR.style.visibility = "hidden";
       } else if (forward) {
         const source = leafNode(slotR);
