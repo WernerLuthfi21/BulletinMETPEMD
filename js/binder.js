@@ -1088,7 +1088,7 @@
   // stack can remain behind the cover.
   const lidRevealPage = document.getElementById("lidRevealPage");
 
-  function syncLidRevealPage() {
+  async function syncLidRevealPage() {
     if (B.single || !lidRevealPage) return;
     lidRevealPage.textContent = "";
 
@@ -1099,16 +1099,24 @@
       : spread.find((p) => p && !p.placeholder);
     if (!first) return;
 
-    const page = buildReadyLeafContent(pageMeta(first), "right");
+    // The reveal plane must never show its own Loading state. Preload the exact
+    // Page #1 first, then clone from the resolved cache so the opening begins
+    // with a finished physical sheet, not a loading card.
+    await preloadPage(first);
+
+    const page = buildLeafContent(pageMeta(first), "right");
     page.querySelectorAll(".leaf-open").forEach((el) => el.remove());
     page.setAttribute("aria-hidden", "true");
     page.classList.add("lid-reveal-inner");
     lidRevealPage.appendChild(page);
   }
 
-  function openBinder() {
+  async function openBinder() {
     if (B.opened || flipping || navigationBusy) return;
-    if (!B.single) syncLidRevealPage();
+    if (!B.single) {
+      binderEl.setAttribute("data-cover-opening", "true");
+      await syncLidRevealPage();
+    }
 
     B.opened = true;
     binderEl.setAttribute("data-state", "open");
@@ -1118,6 +1126,8 @@
     if (M.reducedMotion()) {
       lid.style.opacity = "0";
       lid.style.pointerEvents = "none";
+      binderEl.removeAttribute("data-cover-opening");
+      if (lidRevealPage) lidRevealPage.style.opacity = "0";
       return;
     }
 
@@ -1166,11 +1176,12 @@
         return;
       }
 
-      // The rear page is now aligned with the real page beneath it. Fade only
-      // the lid away so the physical page visibly settles into the binder
-      // instead of exposing a mirrored cover for the final frame.
+      // Keep the resolved reveal plane visible until the real Page #1 is already
+      // on screen. Then expose the real spread and retire the temporary plane;
+      // this removes both the loading flash and the closing/opening after-image.
       lid.style.transition = "opacity 110ms ease";
       if (lidRevealPage) lidRevealPage.style.opacity = "1";
+      binderEl.removeAttribute("data-cover-opening");
       lid.style.opacity = "0";
       lid.style.pointerEvents = "none";
       lid.style.transform =
@@ -1180,10 +1191,13 @@
     requestAnimationFrame(frame);
   }
 
-  function closeBinder() {
+  async function closeBinder() {
     if (!B.opened || flipping || navigationBusy) return;
 
-    if (!B.single) syncLidRevealPage();
+    if (!B.single) {
+      binderEl.setAttribute("data-cover-opening", "true");
+      await syncLidRevealPage();
+    }
 
     B.opened = false;
     lid.setAttribute("tabindex", "0");
@@ -1192,6 +1206,7 @@
 
     if (M.reducedMotion()) {
       binderEl.setAttribute("data-state", "closed");
+      binderEl.removeAttribute("data-cover-opening");
       if (lidRevealPage) lidRevealPage.style.opacity = "0";
       lid.style.opacity = "1";
       lid.style.transform = "translate3d(0,0,0) rotateY(0deg) rotateX(0deg)";
@@ -1243,6 +1258,7 @@
       }
 
       binderEl.setAttribute("data-state", "closed");
+      binderEl.removeAttribute("data-cover-opening");
       if (lidRevealPage) lidRevealPage.style.opacity = "0";
       lid.style.transition = "none";
       lid.style.opacity = "1";
