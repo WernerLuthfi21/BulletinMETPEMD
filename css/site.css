@@ -585,10 +585,10 @@ button.key svg,a.key svg{width:17px;height:17px;flex:none}
   position:absolute;
   left:50%;top:calc(var(--mt) + 6px);
   width:calc(var(--lw) - 14px);height:calc(var(--lh) - 13px);
-  z-index:13;
+  z-index:16;
   overflow:visible;pointer-events:none;
   transform-origin:0 50%;
-  transform:translate3d(0,0,0) rotateY(0deg) rotateX(0deg);
+  transform:translate3d(0,0,0) rotateY(0deg) rotateX(0deg) translateZ(3px);
   transform-style:preserve-3d;
   backface-visibility:visible;-webkit-backface-visibility:visible;
   border-radius:2px 4px 4px 2px;
