@@ -582,10 +582,22 @@ button.key svg,a.key svg{width:17px;height:17px;flex:none}
    when closed, travels with the cover through the swing, and settles flat on
    the binder plane as the cover reaches its open position. */
 .lid-sheet{
-  position:absolute;inset:6px 7px 7px 8px;z-index:3;
-  overflow:hidden;pointer-events:none;
+  position:absolute;
+  left:50%;top:calc(var(--mt) + 6px);
+  width:calc(var(--lw) - 14px);height:calc(var(--lh) - 13px);
+  z-index:13;
+  overflow:visible;pointer-events:none;
   transform-origin:0 50%;
-  transform:rotateY(180deg) translateZ(1.5px);
+  transform:translate3d(0,0,0) rotateY(0deg) rotateX(0deg);
+  transform-style:preserve-3d;
+  backface-visibility:visible;-webkit-backface-visibility:visible;
+  border-radius:2px 4px 4px 2px;
+  opacity:0;visibility:hidden;
+  will-change:transform,opacity;
+}
+.lid-sheet-face{
+  position:absolute;inset:0;overflow:hidden;
+  transform:rotateY(180deg) translateZ(1.4px);
   transform-style:preserve-3d;
   backface-visibility:hidden;-webkit-backface-visibility:hidden;
   border:1px solid rgba(77,58,37,.18);
@@ -597,11 +609,10 @@ button.key svg,a.key svg{width:17px;height:17px;flex:none}
   position:absolute!important;inset:0!important;
   width:100%!important;height:100%!important;
   overflow:hidden!important;
-  transform:rotate(.35deg) translateZ(.8px);
-  transform-origin:50% 50%;
+  transform:none!important;
 }
 .lid-sheet .leaf-open{pointer-events:none!important;cursor:default!important}
-.lid-sheet::before{
+.lid-sheet-face::before{
   content:"";position:absolute;inset:0;z-index:9;pointer-events:none;
   background:
     linear-gradient(90deg,rgba(30,16,8,.16),transparent 8% 82%,rgba(0,0,0,.06)),
