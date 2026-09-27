@@ -134,7 +134,12 @@ img{max-width:100%}
 .binder[data-state="closed"]:not([data-motion]) + .tabs{opacity:0;visibility:hidden;pointer-events:none}
 .binder[data-motion="opening"] .spread,
 .binder[data-motion="closing"] .spread{
-  opacity:1;visibility:visible;clip-path:none;
+  opacity:1;visibility:visible;
+  /* clip-path is intentionally NOT set here: js/binder.js writes it inline,
+     every frame, from the same progress value that drives the cover. If a
+     clip-path were set here it would apply instantly the moment data-motion
+     is toggled — before the cover has rotated at all — which is exactly the
+     "page 1 already showing before the cover has moved" bug. */
 }
 /* The first spread's own tilt during opening/closing is now written every
    animation frame by js/binder.js (setPageOpenPose), driven by the exact

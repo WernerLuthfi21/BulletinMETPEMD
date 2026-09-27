@@ -1032,6 +1032,18 @@
   // start following slightly after the cover (a thinner, lighter layer
   // stacked underneath), and it always finishes flat exactly when the
   // cover finishes its own motion, because both read off the same `e`.
+  // The spread must never be more "open" than the cover's own progress
+  // allows, or the first page flashes fully into view before the cover has
+  // actually rotated (this was reported as "page 1 already showing before
+  // the cover moves"). Instead of toggling clip-path via a CSS class the
+  // instant the motion starts, we write it inline every frame from the same
+  // `e` that drives setCoverPose, so it can only ever be exactly as open as
+  // the cover currently is — never more, never less, at any point in time.
+  function setSpreadClipPose(e, opening) {
+    const pct = opening ? 50 * (1 - e) : 50 * e;
+    spreadEl.style.clipPath = pct > 0.05 ? "inset(0 0 0 " + pct.toFixed(2) + "%)" : "";
+  }
+
   const PAGE_TILT_DEG = 58;
   const PAGE_LAG = 0.14;
   function setPageOpenPose(e, opening) {
@@ -1063,6 +1075,7 @@
         if (start == null) start = ts;
         const p = M.clamp((ts - start) / OPEN_MS, 0, 1);
         const e = setCoverPose(p, opening);
+        setSpreadClipPose(e, opening);
         setPageOpenPose(e, opening);
         setBinderX(fromX + (toX - fromX) * e);
         paintPaperMotion(p);
@@ -1073,6 +1086,7 @@
 
       if (M.reducedMotion()) {
         setCoverPose(1, opening);
+        setSpreadClipPose(1, opening);
         setPageOpenPose(1, opening);
         setBinderX(toX);
         paintPaperMotion(0);
@@ -1112,6 +1126,7 @@
     lid.style.pointerEvents = "none";
     setCoverHinge();
     setCoverPose(0, true);
+    setSpreadClipPose(0, true);
     setPageOpenPose(0, true);
     paintPaperMotion(0);
 
@@ -1134,6 +1149,7 @@
       lid.style.visibility = "hidden";
       lid.style.pointerEvents = "none";
       setCoverPose(1, true);
+      setSpreadClipPose(1, true);
       setPageOpenPose(1, true);
       lid.style.transform = "rotateY(-180deg)";
       paintPaperMotion(0);
@@ -1144,6 +1160,7 @@
       binderEl.setAttribute("data-state", "closed");
       binderEl.removeAttribute("data-motion");
       setCoverPose(0, true);
+      setSpreadClipPose(0, true);
       setPageOpenPose(0, true);
       lid.style.opacity = "1";
       lid.style.visibility = "visible";
@@ -1176,6 +1193,7 @@
     lid.style.pointerEvents = "none";
     setCoverHinge();
     setCoverPose(0, false);
+    setSpreadClipPose(0, false);
     setPageOpenPose(0, false);
     paintPaperMotion(0);
 
@@ -1185,6 +1203,7 @@
         binderEl.removeAttribute("data-motion");
         setBinderX(closedX);
         setCoverPose(1, false);
+        setSpreadClipPose(1, false);
         setPageOpenPose(1, false);
         lid.style.transform = "rotateY(0deg)";
         lid.style.opacity = "1";
@@ -1199,6 +1218,7 @@
       binderEl.setAttribute("data-state", "open");
       binderEl.removeAttribute("data-motion");
       setCoverPose(1, true);
+      setSpreadClipPose(1, true);
       setPageOpenPose(1, true);
       lid.style.opacity = "0";
       lid.style.visibility = "hidden";
