@@ -65,22 +65,14 @@
   // anywhere on the page instead — still "automatic" from the visitor's
   // point of view, just delayed to their first touch.
   //
-  // The track list itself is NOT hardcoded here: it's read from
-  // assets/audio/tracks.json, which tools/generate_audio_manifest.py (run
-  // by the "Update audio manifest" GitHub Action on every push that touches
-  // assets/audio/) rebuilds from whatever files are actually in that
-  // folder. Drop a new track in assets/audio/, push, and it appears in the
-  // picker with no code changes. The FALLBACK list below only covers the
-  // two tracks that shipped before the manifest existed, in case the fetch
-  // fails (e.g. opened straight from disk without a server).
+  // The public picker intentionally exposes one shared default soundtrack:
+  // Mechanical Room Tone. Additional source files can remain in the repo,
+  // but every visitor starts from the same track.
   const MUSIC_KEY = "metp_music_on";
   const TRACK_KEY = "metp_music_track";
   const MANIFEST_URL = "assets/audio/tracks.json";
   const FALLBACK_TRACKS = [
-    { id: "ambient-room-tone", label: "Ambient Room Tone", src: "assets/audio/ambient-room-tone.m4a" },
-    { id: "astaga-bercanda", label: "Astaga Bercanda", src: "assets/audio/astaga-bercanda.mp3" },
-    { id: "dj-mabur-duwur-melayang-layang", label: "DJ Mabur Duwur Melayang Layang", src: "assets/audio/dj-mabur-duwur-melayang-layang.mp3" },
-    { id: "kicau-mania-ndarboy-genk-x-banditoz", label: "Kicau Mania Ndarboy Genk x Banditoz", src: "assets/audio/kicau-mania-ndarboy-genk-x-banditoz.mp3" }
+    { id: "Mechanical Room Tone", label: "Mechanical Room Tone", src: "assets/audio/Mechanical Room Tone.mp3" }
   ];
 
   async function loadTracks() {
