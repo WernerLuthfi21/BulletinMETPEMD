@@ -792,6 +792,7 @@
     let sheet = null;
     let underlay = null;
     let progress = 0;
+    let dragWidth = 1;
     let clickSuppressed = false;
 
     function cleanup(cancelOnly) {
@@ -830,6 +831,7 @@
       const destination = B.spreads[target] || [];
       const rect = spreadEl.getBoundingClientRect();
       const half = B.single ? rect.width : rect.width / 2;
+      dragWidth = Math.max(1, half);
 
       if (B.single) {
         const source = leafNode(slotR);
@@ -892,7 +894,31 @@
 
     function animateRelease(targetProgress, dir, commit, after) {
       const from = progress;
-      const duration = Math.max(140, Math.round(260 + Math.abs(targetProgress - from) * 360));
+      const duration = M.reducedMotion()
+        ? 0
+        : Math.max(140, Math.round(260 + Math.abs(targetProgress - from) * 360));
+
+      function finishRelease() {
+        if (commit) {
+          B.cur += forward ? 1 : -1;
+          const destination = B.spreads[B.cur] || [];
+          const first = destination.find((p) => p && !p.placeholder);
+          if (first) B.selectedIssueId = first.issue.id;
+          renderSpreadCore();
+        }
+        cleanup(!commit);
+        renderMeta();
+        renderTabs();
+        if (after) after();
+      }
+
+      if (!duration) {
+        progress = targetProgress;
+        updateTurnProgress(sheet, progress, dir);
+        finishRelease();
+        return;
+      }
+
       let start = null;
       function frame(ts) {
         if (start == null) start = ts;
@@ -901,19 +927,7 @@
         progress = from + (targetProgress - from) * e;
         updateTurnProgress(sheet, progress, dir);
         if (q < 1) requestAnimationFrame(frame);
-        else {
-          if (commit) {
-            B.cur += forward ? 1 : -1;
-            const destination = B.spreads[B.cur] || [];
-            const first = destination.find((p) => p && !p.placeholder);
-            if (first) B.selectedIssueId = first.issue.id;
-            renderSpreadCore();
-          }
-          cleanup(!commit);
-          renderMeta();
-          renderTabs();
-          if (after) after();
-        }
+        else finishRelease();
       }
       requestAnimationFrame(frame);
     }
@@ -946,9 +960,9 @@
     el.addEventListener("pointermove", (e) => {
       if (!active || e.pointerId !== pointerId || !sheet) return;
       lastX = e.clientX;
-      const rect = spreadEl.getBoundingClientRect();
-      const width = B.single ? rect.width : rect.width / 2;
-      const raw = forward ? (startX - lastX) / width : (lastX - startX) / width;
+      const raw = forward
+        ? (startX - lastX) / dragWidth
+        : (lastX - startX) / dragWidth;
       progress = M.clamp(raw, 0, 1);
       if (Math.abs(lastX - startX) > 6) { moved = true; clickSuppressed = true; }
       updateTurnProgress(sheet, progress, forward ? 1 : -1);
