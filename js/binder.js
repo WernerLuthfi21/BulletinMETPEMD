@@ -793,7 +793,6 @@
     let progress = 0;
     let dragWidth = 1;
     let startY = 0;
-    let lastY = 0;
     let lastMoveTime = 0;
     let dragVelocity = 0;
     let gestureAxis = 0; // 1 = horizontal, -1 = vertical/cancelled
@@ -844,20 +843,11 @@
         const currentSpread = B.spreads[B.cur] || [null, null];
         await hydrateLeafImage(source, pageMeta(currentSpread[1]));
         if (!active) { navigationBusy = false; return false; }
-        // Single preparation for the destination page: the underlay behind
-        // the turning sheet needs the same content as the sheet's own back
-        // face, but as a separate DOM node (it can't share the node the
-        // sheet is about to own). Build+hydrate once and clone the result
-        // instead of running buildReadyLeafContent's async preload/decode
-        // pipeline twice for the same page. The underlay is pointer-events:
-        // none, so the clone not carrying the (inert-until-clicked) reader
-        // button's live listener has no visible effect.
+        // Mobile has one physical sheet, so the destination is prepared
+        // once and placed directly on that sheet's back face.
         const back = dest
           ? await buildReadyLeafContent(pageMeta(dest), "right")
           : await buildReadyLeafContent(null, "right");
-        if (!active) { navigationBusy = false; return false; }
-        // Mobile uses one sheet; this clone remains only as a prepared
-        // fallback for the existing underlay path and is not displayed.
         if (!active) { navigationBusy = false; return false; }
         sheet = makeTurnSheet(source, back, forward ? 1 : -1);
         slotR.style.visibility = "hidden";
@@ -953,7 +943,7 @@
       pending = true;
       clickSuppressed = false;
       startX = lastX = e.clientX;
-      startY = lastY = e.clientY;
+      startY = e.clientY;
       lastMoveTime = performance.now();
       dragVelocity = 0;
       gestureAxis = 0;
@@ -999,7 +989,6 @@
       if (gestureAxis < 0) return;
 
       lastX = e.clientX;
-      lastY = e.clientY;
       const raw = forward
         ? (startX - lastX) / dragWidth
         : (lastX - startX) / dragWidth;
@@ -1080,12 +1069,9 @@
     lid.style.transformOrigin = "left center";
   }
 
-  const COVER_FRONT_DEPTH = 8;
-  const COVER_BACK_DEPTH = -10;
   function renderOpeningPose(progress) {
     const p = .5 - .5 * Math.cos(Math.PI * M.clamp(progress, 0, 1));
     const coverAngle = -180 * p;
-    const coverDepth = COVER_FRONT_DEPTH + (COVER_BACK_DEPTH - COVER_FRONT_DEPTH) * p;
     lid.style.transform = "rotateY(" + coverAngle.toFixed(3) + "deg)";
     // The turning geometry must never be revealed through a second clip path.
     // The binder/page boundary owns clipping; the cover simply swings away.
