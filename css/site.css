@@ -90,8 +90,10 @@ img{max-width:100%}
   width:calc(var(--lw)*2 + var(--ms)*2);
   height:calc(var(--lh) + var(--mt) + var(--mb));
   perspective:2600px;perspective-origin:50% 35%;
-  transition:transform .9s var(--ease);
-  transform:translateX(0) rotate(-.35deg);
+  transition:transform 1.05s cubic-bezier(.16,.82,.22,1);
+  transform:translate3d(0,0,0) rotate(-.35deg);
+  transform-style:preserve-3d;
+  will-change:transform;
 }
 /* closed: only the right half (front cover) is visible, centred */
 /* (+ half the tab gutter, so the lone cover sits centred between the desk props) */
@@ -100,7 +102,10 @@ img{max-width:100%}
 
 .b-shadow{
   position:absolute;inset:10px -8px -22px 14px;border-radius:14px;z-index:0;
-  background:rgba(14,5,2,.55);filter:blur(18px);transition:opacity .6s;
+  background:rgba(14,5,2,.55);filter:blur(18px);
+  transition:opacity .18s ease,transform .18s ease;
+  transform-origin:58% 42%;
+  will-change:transform,opacity;
 }
 .binder[data-state="closed"] .b-shadow{clip-path:inset(0 0 0 50%)}
 
@@ -201,30 +206,30 @@ img{max-width:100%}
 
 .binder[data-state="open"] .spread{z-index:8}
 .spread-page-tags{
-  position:absolute;left:0;right:0;top:-32px;height:24px;z-index:20;
+  position:absolute;left:0;right:0;top:-24px;height:17px;z-index:20;
   display:flex;align-items:center;pointer-events:none;user-select:none;
 }
 .spread-page-tag{
-  box-sizing:border-box;width:50%;margin:0 4px;padding:5px 12px;
-  color:#fffaf4;background:rgba(58,34,19,.94);
-  border:1px solid rgba(255,225,190,.55);border-radius:4px;
-  font:700 10px/1 var(--cond);letter-spacing:.08em;text-transform:uppercase;
+  box-sizing:border-box;width:50%;margin:0 3px;padding:3px 8px;
+  color:rgba(255,248,238,.88);background:rgba(73,38,28,.48);
+  border:1px solid rgba(246,225,198,.24);border-radius:3px;
+  font:600 8.5px/1 var(--cond);letter-spacing:.07em;text-transform:uppercase;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;
-  text-shadow:0 1px 1px rgba(0,0,0,.65);
-  box-shadow:0 2px 5px rgba(20,8,3,.28),inset 0 1px 0 rgba(255,255,255,.16);
+  text-shadow:0 1px 2px rgba(0,0,0,.42);
+  box-shadow:0 1px 3px rgba(20,8,3,.16),inset 0 1px 0 rgba(255,255,255,.10);
 }
 .spread-page-tag.left{margin-right:2px}
 .spread-page-tag.right{margin-left:2px}
-.binder[data-mode="single"] .spread-page-tags{top:-30px;height:24px}
+.binder[data-mode="single"] .spread-page-tags{top:-23px;height:16px}
 .binder[data-mode="single"] .spread-page-tag.left{display:none}
 .binder[data-mode="single"] .spread-page-tag.right{
-  width:100%;margin:0 4px;padding:5px 10px;text-align:center;
+  width:100%;margin:0 3px;padding:3px 8px;text-align:center;
 }
 @media (max-width:900px){
   .binder[data-state="open"] .spread{z-index:8}
-  .spread-page-tags{top:-29px;height:23px}
-  .spread-page-tag{width:calc(50% - 4px);font-size:9px;padding:5px 7px}
-  .binder[data-mode="single"] .spread-page-tag.right{width:calc(100% - 8px)}
+  .spread-page-tags{top:-22px;height:16px}
+  .spread-page-tag{width:calc(50% - 4px);font-size:8px;padding:3px 6px}
+  .binder[data-mode="single"] .spread-page-tag.right{width:calc(100% - 6px)}
 }
 .leaf{
   position:absolute;inset:0;overflow:hidden;background:#faf5e8;color:var(--ink);
@@ -540,26 +545,48 @@ button.key svg,a.key svg{width:17px;height:17px;flex:none}
 
 /* outside front cover (closed state + opening animation) */
 .lid{
-  position:absolute;z-index:14;right:0;top:0;bottom:0;width:50%;transform-origin:0 50%;transform-style:preserve-3d;
-  transform:rotateY(0);cursor:pointer;
+  position:absolute;z-index:14;right:0;top:0;bottom:0;width:50%;
+  transform-origin:0 50%;transform-style:preserve-3d;backface-visibility:visible;
+  transform:translate3d(0,0,0) rotateY(0deg);cursor:pointer;
+  will-change:transform,opacity;
 }
 .binder[data-mode="single"] .lid{width:100%}
 .lid-face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:3px 9px 9px 3px;overflow:hidden}
 .lid-face.front{
   background:
-    radial-gradient(ellipse at 22% 12%,rgba(255,215,210,.35),transparent 55%),
+    radial-gradient(ellipse at var(--lid-light-x,22%) var(--lid-light-y,12%),rgba(255,223,216,.36),transparent 52%),
+    linear-gradient(115deg,rgba(255,255,255,.08),transparent 34% 66%,rgba(0,0,0,.18)),
     url(../assets/textures/cover-grain.webp) 0 0/230px auto,
     linear-gradient(135deg,var(--red-500),var(--red-700) 60%,var(--red-900));
-  background-blend-mode:normal,soft-light,normal;
-  box-shadow:inset 2px 2px 0 rgba(255,200,200,.32),inset -2px -2px 0 rgba(0,0,0,.35);
+  background-blend-mode:normal,normal,soft-light,normal;
+  box-shadow:
+    inset 2px 2px 0 rgba(255,200,200,.32),
+    inset -3px -3px 0 rgba(0,0,0,.36),
+    10px 14px 18px rgba(20,7,3,.18);
+  transition:box-shadow .18s ease;
 }
 .lid-face.back{
   transform:rotateY(180deg);border-radius:9px 3px 3px 9px;
   background:url(../assets/textures/cover-grain.webp) 0 0/230px auto,linear-gradient(135deg,var(--red-600),var(--red-800) 70%,var(--red-900));
   background-blend-mode:soft-light,normal;
 }
-.lid-face .shade{position:absolute;inset:0;background:#120404;opacity:0;pointer-events:none}
+.lid-face .shade{
+  position:absolute;inset:0;
+  background:radial-gradient(ellipse at 10% 50%,rgba(0,0,0,.02),rgba(15,3,4,.72) 78%);
+  opacity:0;pointer-events:none;
+  mix-blend-mode:multiply;
+  transition:opacity .08s linear;
+}
 .lid-hinge{position:absolute;left:0;top:0;bottom:0;width:26px;background:linear-gradient(90deg,rgba(0,0,0,.42),rgba(0,0,0,.10) 60%,transparent);pointer-events:none}
+.lid-face.front::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(108deg,transparent 24%,rgba(255,244,235,.14) 42%,transparent 58%);
+  transform:translateX(-35%);opacity:.0;
+  mix-blend-mode:screen;
+}
+.binder[data-state="open"] .lid-face.front::after{opacity:.75}
+.lid-hinge{box-shadow:inset -6px 0 9px rgba(0,0,0,.18)}
+
 .lid-sticker{position:absolute;left:8%;top:26%;width:86%;aspect-ratio:300/78;transform:rotate(-4deg);filter:var(--sh-2)}
 .lid-sticker svg{width:100%;height:100%;display:block;overflow:visible}
 
