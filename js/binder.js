@@ -456,13 +456,14 @@
     pageCountEl.textContent = total ? "Page " + M.clamp(currentPageNumber, 1, total) + " / " + total : "Page 0 / 0";
 
     if (curPage) {
+      const pageSuffix = curPage.issue.displayPageCount > 1 ? " #" + (curPage.pageIndex + 1) : "";
       issueTitleEl.textContent = curPage.issue.label + (curPage.issue.title ? " \u2014 " + curPage.issue.title : "");
       btnOriginal.hidden = false;
       curPage.issue.getUrl().then((u) => (btnOriginal.href = u)).catch(() => { btnOriginal.hidden = true; });
       // Block-based pages (data-driven spread content) have no page image to
       // zoom into, so "Read" (the reader's zoom view) doesn't apply to them.
       btnRead.hidden = !!curPage.issue.spread;
-      cardTitle.textContent = curPage.issue.label + (curPage.issue.title ? " \u2014 \u201C" + curPage.issue.title + "\u201D" : "");
+      cardTitle.textContent = curPage.issue.label + pageSuffix + (curPage.issue.title ? " \u2014 \u201C" + curPage.issue.title + "\u201D" : "");
       renderCredits(curPage.issue);
     } else {
       issueTitleEl.textContent = "Next issue \u2014 " + (a || b).label;
