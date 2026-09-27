@@ -61,7 +61,8 @@ create table if not exists public.issues (
   status text not null default 'draft' check (status in ('draft','published')),
   file_path text,                 -- path inside the "bulletins" storage bucket
   file_type text,                 -- 'pdf' | 'png' | 'jpg' | 'jpeg'
-  page_count int,                 -- filled in by the admin panel after upload
+  page_count int,                 -- number of pages in the uploaded PDF/image source
+  display_page_count int not null default 2 check (display_page_count between 1 and 2),
   highlights jsonb not null default '[]'::jsonb,  -- [{heading,text}, ...] text version
   published_at timestamptz,
   created_by uuid references auth.users(id),
@@ -69,6 +70,21 @@ create table if not exists public.issues (
   updated_at timestamptz not null default now(),
   unique (year, month)
 );
+-- Existing projects created before display_page_count existed need this additive migration.
+alter table public.issues
+  add column if not exists display_page_count int not null default 2;
+do $
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'issues_display_page_count_check'
+      and conrelid = 'public.issues'::regclass
+  ) then
+    alter table public.issues
+      add constraint issues_display_page_count_check check (display_page_count between 1 and 2);
+  end if;
+end $;
+
 alter table public.issues enable row level security;
 
 create policy "public reads published issues"
