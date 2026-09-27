@@ -556,7 +556,13 @@ button.key svg,a.key svg{width:17px;height:17px;flex:none}
   cursor:pointer;will-change:transform;
   transition:none!important;
 }
-.binder[data-mode="single"] .lid{width:100%}
+/* Single/mobile cover must start flush at the ring spine, same as the
+   desktop lid starts flush at its own left edge — its hinge pivot is that
+   same edge (see setCoverHinge()). Previously this spanned the full binder
+   width (right:0;width:100%) while the pivot sat ~var(--ms)+16px inside it,
+   so the sliver left of the pivot rotated on the wrong side of the hinge
+   and visually detached from the rest of the cover mid-flip. */
+.binder[data-mode="single"] .lid{left:calc(var(--ms) + 16px);width:auto}
 .lid-face{
   position:absolute;inset:0;
   backface-visibility:hidden;-webkit-backface-visibility:hidden;

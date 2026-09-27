@@ -1019,7 +1019,10 @@
   let openingLastTime = 0;
   let openingReady = false;
   function setCoverHinge() {
-    lid.style.transformOrigin = B.single ? "calc(var(--ms) + 16px) center" : "left center";
+    // The single/mobile .lid now starts flush at the ring spine (see
+    // css/site.css), matching the desktop lid's own left edge — so both
+    // modes pivot at the element's own left edge, no per-mode offset needed.
+    lid.style.transformOrigin = "left center";
   }
 
   const COVER_FRONT_DEPTH = 8;
