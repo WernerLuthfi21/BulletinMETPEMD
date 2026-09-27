@@ -18,15 +18,5 @@
     "id": "kicau-mania-ndarboy-genk-x-banditoz",
     "label": "Kicau Mania Ndarboy Genk x Banditoz",
     "src": "assets/audio/kicau-mania-ndarboy-genk-x-banditoz.mp3"
-  },
-  {
-    "id": "mechanical-room-tone",
-    "label": "Mechanical Room Tone",
-    "src": "assets/audio/mechanical-room-tone.mp3"
-  },
-  {
-    "id": "read",
-    "label": "Read",
-    "src": "assets/audio/read.mp3"
   }
 ]
