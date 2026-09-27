@@ -209,6 +209,13 @@ img{max-width:100%}
 .binder[data-cover-opening="true"] .slot.left{
   opacity:0!important;visibility:hidden!important;
 }
+.binder[data-cover-opening="true"] .b-bar,
+.binder[data-cover-opening="true"] .hint{
+  opacity:0!important;visibility:hidden!important;pointer-events:none!important;
+}
+.binder[data-state="closed"] .b-shadow{
+  opacity:0!important;
+}
 .spread-page-tags{
   position:absolute;left:0;right:0;top:-20px;height:18px;z-index:30;
   display:flex;align-items:flex-end;gap:4px;pointer-events:none;user-select:none;
