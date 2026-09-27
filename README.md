@@ -53,8 +53,10 @@ that everyone sees, connect a free [Supabase](https://supabase.com) project:
 
 1. **Create a project** at supabase.com.
 2. **Run the schema.** Open the SQL editor and run the full contents of
-   `supabase/schema.sql`. This creates the `issues`, `comments`, `quotes`
-   and `admins` tables with Row Level Security already locked down.
+   `supabase/schema.sql`. This creates the `issues`, `issue_pages`,
+   `comments`, `quotes` and `admins` tables with Row Level Security
+   already locked down. Existing projects can apply
+   `supabase/migrations/20260927_add_issue_page_assets.sql` instead.
 3. **Create a private Storage bucket** named `bulletins`
    (Storage → New bucket → leave "Public bucket" **unchecked**).
 4. **Create your admin login.** Authentication → Users → Add user (email +
@@ -87,15 +89,18 @@ never shows a blank page.
 
 ## Adding future issues
 
-**With the backend:** sign in to `admin.html` → "New issue" → fill in the
-month/year/credits, drag in the PDF/PNG/JPG, optionally fill in the text
-version (used by the reader and screen readers), tick "Published", save.
+**With the backend:** sign in to `admin.html` → "New issue" → choose
+**1 page** or **2 pages**, then upload **Page #1** and, when enabled,
+**Page #2** independently. Each logical page is stored in `issue_pages`,
+so a month can have its own #1 and #2 files and the public binder navigates
+them in that exact order. Each uploaded PDF must contain one source page;
+PNG/JPG uploads are naturally one page. Optionally fill in the text version
+(used by the reader and screen readers), tick "Published", and save.
 
 **Without the backend (editing bundled data):** add a new object to
-`window.METP_ISSUES` in `data/issues.js` and drop the file in
-`assets/issues/`. Pre-rendering a PDF to WebP page images (as the bundled
-August issue does) keeps the binder fast — pdf.js is only used as a
-fallback for issues that don't have `pages` pre-rendered.
+`window.METP_ISSUES` in `data/issues.js` and set
+`display_page_count: 1` or `2`. A bundled issue may expose its pages
+through `pages`/`static_pages` or the existing data-driven `spread` object.
 
 ## Notes
 
