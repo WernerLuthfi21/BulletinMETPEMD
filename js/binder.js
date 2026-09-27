@@ -23,7 +23,6 @@
   const hintEl = document.getElementById("hint");
   const pageCountEl = document.getElementById("pageCount");
   const issueTitleEl = document.getElementById("issueTitle");
-  const btnOriginal = document.getElementById("btnOriginal");
   const btnRead = document.getElementById("btnRead");
   const cardTitle = document.getElementById("cardTitle");
   const cardCredits = document.getElementById("cardCredits");
@@ -470,8 +469,6 @@
     if (curPage) {
       const pageSuffix = curPage.issue.displayPageCount > 1 ? " #" + (curPage.pageIndex + 1) : "";
       issueTitleEl.textContent = curPage.issue.label + pageSuffix + (curPage.issue.title ? " \u2014 " + curPage.issue.title : "");
-      btnOriginal.hidden = false;
-      curPage.issue.getUrl(curPage.pageIndex).then((u) => (btnOriginal.href = u)).catch(() => { btnOriginal.hidden = true; });
       // Block-based pages (data-driven spread content) have no page image to
       // zoom into, so "Read" (the reader's zoom view) doesn't apply to them.
       btnRead.hidden = !!curPage.issue.spread;
@@ -479,7 +476,6 @@
       renderCredits(curPage.issue);
     } else {
       issueTitleEl.textContent = "Next issue \u2014 " + (a || b).label;
-      btnOriginal.hidden = true;
       btnRead.hidden = true;
       cardTitle.textContent = "Next issue";
       cardCredits.textContent = "";
