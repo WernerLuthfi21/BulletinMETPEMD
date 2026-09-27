@@ -848,6 +848,7 @@
             : await buildReadyLeafContent(null, "right"),
           0, rect.width
         );
+        if (!active) { underlay.remove(); navigationBusy = false; return false; }
         sheet = makeTurnSheet(source, back, forward ? 1 : -1);
         slotR.style.visibility = "hidden";
       } else if (forward) {
@@ -864,6 +865,7 @@
             : await buildReadyLeafContent(null, "right"),
           half, half
         );
+        if (!active) { underlay.remove(); navigationBusy = false; return false; }
         sheet = makeTurnSheet(source, back, 1);
         slotR.style.visibility = "hidden";
       } else {
@@ -880,6 +882,7 @@
             : await buildReadyLeafContent(null, "left"),
           0, half
         );
+        if (!active) { underlay.remove(); navigationBusy = false; return false; }
         sheet = makeTurnSheet(source, back, -1);
         slotL.style.visibility = "hidden";
       }
