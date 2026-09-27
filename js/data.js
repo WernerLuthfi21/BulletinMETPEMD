@@ -69,7 +69,8 @@
       events: raw.events || [],
       _pv: {}, _pp: {}, _preview: {}, _previewP: {}
     };
-    if (issue.spread) issue.pageCount = issue.displayPageCount;
+    if (issue.pageSlots && issue.displayPageCount) issue.pageCount = issue.displayPageCount;
+    else if (issue.spread) issue.pageCount = issue.displayPageCount;
     else if (issue.staticPages && !raw.page_count) issue.pageCount = issue.staticPages.length;
     else if (issue.fileType === "png" || issue.fileType === "jpg" || issue.fileType === "jpeg") issue.pageCount = 1;
 
