@@ -1098,33 +1098,23 @@
       : spread.find((p) => p && !p.placeholder);
     if (!first) return;
 
-    // Prefer the exact leaf already rendered in the open spread. This avoids a
-    // second signed-URL request and, more importantly, puts the SAME decoded
-    // photograph/text surface on the cover sheet from animation frame 0.
+    // Reuse the already-rendered first page when possible. This gives the
+    // cover sheet the exact same asset/content as the settled binder page,
+    // with no second network/render operation.
     let sourceLeaf = null;
     if (spread[0] && samePage(spread[0], first)) sourceLeaf = slotL.firstElementChild;
-    else if (spread[1] && samePage(spread[1], first)) sourceLeaf = slotR.firstElementChild;
+    if (!sourceLeaf && spread[1] && samePage(spread[1], first)) sourceLeaf = slotR.firstElementChild;
 
-    if (sourceLeaf) {
-      const clone = sourceLeaf.cloneNode(true);
-      clone.classList.add("lid-bound-sheet-leaf");
-      clone.querySelectorAll(".leaf-open").forEach((el) => el.remove());
-      sheet.appendChild(clone);
-      // If the visible leaf was still loading, hydrate the cover copy in the
-      // background; the cover motion itself never waits on the network.
-      if (!clone.querySelector(".leaf-img") && !first.issue.spread) {
-        hydrateLeafImage(clone, pageMeta(first)).catch((e) => {
-          console.warn("[METP] cover sheet hydration failed", e);
-        });
-      }
-      return;
-    }
+    const page = sourceLeaf
+      ? sourceLeaf.cloneNode(true)
+      : buildLeafContent(pageMeta(first), "right");
 
-    // Fallback for a freshly switched model where no visible leaf exists yet.
-    const page = buildReadyLeafContent(pageMeta(first), "right");
     page.classList.add("lid-bound-sheet-leaf");
     page.querySelectorAll(".leaf-open").forEach((el) => el.remove());
     sheet.appendChild(page);
+    sheet.style.opacity = "0";
+    sheet.style.visibility = "visible";
+    sheet.style.transform = "translate3d(0,0,0) rotateY(0deg) rotateX(0deg)";
   }
 
   function openBinder() {
@@ -1134,13 +1124,24 @@
     binderEl.setAttribute("data-state", "open");
     lid.setAttribute("tabindex", "-1");
     M.sound && M.sound.open();
-    if (M.reducedMotion()) { lid.style.opacity = "0"; lid.style.pointerEvents = "none"; return; }
+    if (M.reducedMotion()) {
+      lid.style.opacity = "0";
+      lid.style.pointerEvents = "none";
+      const sheet = document.getElementById("lidSheet");
+      if (sheet) { sheet.style.opacity = "0"; sheet.style.visibility = "hidden"; }
+      return;
+    }
+
     lid.style.opacity = "1";
+    lid.style.pointerEvents = "auto";
     lid.style.transformOrigin = "left center";
+
+    const sheet = document.getElementById("lidSheet");
     const frontShade = lid.querySelector(".front .shade");
     const shadow = binderEl.querySelector(".b-shadow");
     const dur = 1080;
     let start;
+
     function frame(ts) {
       if (start == null) start = ts;
       const t = M.clamp((ts - start) / dur, 0, 1);
@@ -1148,39 +1149,44 @@
       const arc = Math.sin(Math.PI * eased);
       const lift = arc * 5;
       const pitch = -arc * 0.8;
-      lid.style.transform =
+      const angle = -eased * 178;
+
+      const transform =
         "translate3d(0," + (-lift * 0.18).toFixed(2) + "px," + lift.toFixed(2) + "px) " +
-        "rotateY(" + (-eased * 178).toFixed(3) + "deg) " +
+        "rotateY(" + angle.toFixed(3) + "deg) " +
         "rotateX(" + pitch.toFixed(3) + "deg)";
-      lid.style.setProperty("--lid-light-x", Math.round(22 + eased * 18) + "%");
-      lid.style.setProperty("--lid-light-y", Math.round(12 + arc * 10) + "%");
-      if (frontShade) frontShade.style.opacity = String(Math.min(.34, arc * .34));
-      if (shadow) {
-        shadow.style.opacity = String(.55 - arc * .12);
-        shadow.style.transform = "scale(" + (1 - arc * .018).toFixed(3) + "," + (1 - arc * .04).toFixed(3) + ")";
-      }
-      if (t < 1) requestAnimationFrame(frame);
-      else {
-        lid.style.opacity = "0";
-        lid.style.pointerEvents = "none";
-        lid.style.transform = "translate3d(0,0,0) rotateY(-178deg) rotateX(0deg)";
-      }
-    }
-    requestAnimationFrame(frame);
-  }
-  function closeBinder() {
+
+      lid.style.transform = transform;
+
+      // The sheet is a separate plane, but it is driven by the exact same
+      // hinge transform. Its own back face contains page #1, so the page
+      // becomes readable as the red cover swings past edge-on.
+      if (sheet) {
+        sheet.style.transform = transform;
+        const reveal = M.clamp((eased - 0.16) / 0.68, 0, 1);
+        const settle = M.clamp((1 - eased) / 0.12, 0,   function closeBinder() {
     if (!B.opened || flipping || navigationBusy) return;
     if (!B.single) syncLidBackPage();
     B.opened = false;
     lid.setAttribute("tabindex", "0");
     lid.style.pointerEvents = "";
     M.sound && M.sound.close();
-    if (M.reducedMotion()) { binderEl.setAttribute("data-state", "closed"); lid.style.opacity = "1"; lid.style.transform = "rotateY(0deg)"; return; }
+    if (M.reducedMotion()) {
+      const sheet = document.getElementById("lidSheet");
+      binderEl.setAttribute("data-state", "closed");
+      lid.style.opacity = "1";
+      lid.style.transform = "translate3d(0,0,0) rotateY(0deg) rotateX(0deg)";
+      if (sheet) { sheet.style.opacity = "0"; sheet.style.visibility = "hidden"; sheet.style.transform = "translate3d(0,0,0) rotateY(0deg) rotateX(0deg)"; }
+      return;
+    }
+
     lid.style.opacity = "1";
+    const sheet = document.getElementById("lidSheet");
     const frontShade = lid.querySelector(".front .shade");
     const shadow = binderEl.querySelector(".b-shadow");
     const dur = 930;
     let start;
+
     function frame(ts) {
       if (start == null) start = ts;
       const t = M.clamp((ts - start) / dur, 0, 1);
@@ -1188,10 +1194,23 @@
       const arc = Math.sin(Math.PI * (1 - eased));
       const lift = arc * 5;
       const pitch = -arc * 0.8;
-      lid.style.transform =
+      const angle = -178 + eased * 178;
+
+      const transform =
         "translate3d(0," + (-lift * 0.18).toFixed(2) + "px," + lift.toFixed(2) + "px) " +
-        "rotateY(" + (-178 + eased * 178).toFixed(3) + "deg) " +
+        "rotateY(" + angle.toFixed(3) + "deg) " +
         "rotateX(" + pitch.toFixed(3) + "deg)";
+
+      lid.style.transform = transform;
+
+      if (sheet) {
+        sheet.style.transform = transform;
+        const reveal = M.clamp((eased - 0.03) / 0.70, 0, 1);
+        const hide = M.clamp((1 - eased) / 0.16, 0, 1);
+        sheet.style.opacity = String(Math.min(reveal * 0.92, 0.92) * hide);
+        sheet.style.visibility = "visible";
+      }
+
       lid.style.setProperty("--lid-light-x", Math.round(40 - eased * 18) + "%");
       lid.style.setProperty("--lid-light-y", Math.round(12 + arc * 10) + "%");
       if (frontShade) frontShade.style.opacity = String(Math.min(.34, arc * .34));
@@ -1199,14 +1218,21 @@
         shadow.style.opacity = String(.43 + arc * .12);
         shadow.style.transform = "scale(" + (1 - arc * .018).toFixed(3) + "," + (1 - arc * .04).toFixed(3) + ")";
       }
+
       if (t < 1) requestAnimationFrame(frame);
       else {
+        if (sheet) {
+          sheet.style.opacity = "0";
+          sheet.style.visibility = "hidden";
+          sheet.style.transform = "translate3d(0,0,0) rotateY(0deg) rotateX(0deg)";
+        }
         binderEl.setAttribute("data-state", "closed");
         lid.style.transform = "translate3d(0,0,0) rotateY(0deg) rotateX(0deg)";
       }
     }
     requestAnimationFrame(frame);
   }
+
   lid.addEventListener("click", openBinder);
   lid.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openBinder(); } });
   document.getElementById("lidOpen").addEventListener("click", (e) => { e.stopPropagation(); openBinder(); });
