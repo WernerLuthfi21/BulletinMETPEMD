@@ -50,7 +50,10 @@
       publishedAt: raw.published_at || null,
       fileType: (raw.file_type || "").toLowerCase(),
       fileUrl: raw.file || null,          // static/bundled url
-      filePath: raw.file_path || null,    // storage path (live mode)
+      filePath: raw.file_path || null,    // legacy storage path (live mode)
+      pageSlots: Array.isArray(raw.issue_pages) && raw.issue_pages.length
+        ? raw.issue_pages.slice().sort((a, b) => (+a.page_number || 0) - (+b.page_number || 0))
+        : null,
       staticPages: Array.isArray(raw.pages) && raw.pages.length ? raw.pages : (Array.isArray(raw.static_pages) && raw.static_pages.length ? raw.static_pages : null),
       pageCount: raw.page_count || (raw.pages && raw.pages.length) || (raw.static_pages && raw.static_pages.length) || 0,
       displayPageCount: raw.display_page_count != null
@@ -70,7 +73,10 @@
     else if (issue.staticPages && !raw.page_count) issue.pageCount = issue.staticPages.length;
     else if (issue.fileType === "png" || issue.fileType === "jpg" || issue.fileType === "jpeg") issue.pageCount = 1;
 
-    issue.getUrl = () => ensureUrl(issue);
+    issue.getUrl = (i) => {
+      const slot = i != null && issue.pageSlots ? issue.pageSlots.find((p) => (+p.page_number || 0) === i + 1) : null;
+      return slot ? ensurePageSlotUrl(issue, slot) : ensureUrl(issue);
+    };
     issue.count = () => countPages(issue);
     issue.getPage = (i, options) => getPage(issue, i, options);
     issue.cached = (i) => issue._pv[i] || null;
@@ -90,6 +96,26 @@
     return issue._urlP;
   }
 
+  async function ensurePageSlotUrl(issue, slot) {
+    if (!slot || !slot.file_path) throw new Error("No file for issue page");
+    slot._url = slot._url || null;
+    if (slot._url) return slot._url;
+    const key = String(slot.page_number || 1);
+    issue._pageUrlP = issue._pageUrlP || {};
+    if (issue._pageUrlP[key]) return issue._pageUrlP[key];
+    issue._pageUrlP[key] = withTimeout((async () => {
+      if (slot.file_url) return slot.file_url;
+      const c = await getClient();
+      const { data, error } = await c.storage.from(cfg().bucket || "bulletins").createSignedUrl(slot.file_path, 3600);
+      if (error || !data) throw error || new Error("Could not sign issue page URL");
+      return data.signedUrl;
+    })(), PAGE_TIMEOUT, "signing page URL").catch((e) => {
+      delete issue._pageUrlP[key];
+      throw e;
+    });
+    return issue._pageUrlP[key];
+  }
+
   async function pdfDoc(issue) {
     if (!issue._pdf) {
       issue._pdf = withTimeout((async () => {
@@ -103,7 +129,25 @@
     return issue._pdf;
   }
 
+  async function pdfDocForSlot(issue, slot) {
+    const key = String(slot.page_number || 1);
+    issue._slotPdf = issue._slotPdf || {};
+    if (issue._slotPdf[key]) return issue._slotPdf[key];
+    issue._slotPdf[key] = withTimeout((async () => {
+      await M.loadScript("vendor/pdfjs/pdf.min.js");
+      const lib = window.pdfjsLib || window["pdfjs-dist/build/pdf"];
+      lib.GlobalWorkerOptions.workerSrc = "vendor/pdfjs/pdf.worker.min.js";
+      const url = await ensurePageSlotUrl(issue, slot);
+      return lib.getDocument({ url, rangeChunkSize: 64 * 1024, disableAutoFetch: true, disableStream: false }).promise;
+    })(), PAGE_TIMEOUT, "opening issue page PDF").catch((e) => {
+      delete issue._slotPdf[key];
+      throw e;
+    });
+    return issue._slotPdf[key];
+  }
+
   async function countPages(issue) {
+    if (issue.pageSlots && issue.pageSlots.length) return issue.displayPageCount;
     if (issue.pageCount) return issue.pageCount;
     if (issue.fileType === "pdf") {
       const d = await pdfDoc(issue);
@@ -119,6 +163,7 @@
     const cache = preview ? issue._previewP : issue._pp;
     if (cache[i]) return cache[i];
     const alt = issue.label + " bulletin — " + (issue.title ? issue.title + ", " : "") + "page " + (i + 1);
+    const slot = issue.pageSlots && issue.pageSlots.find((p) => (+p.page_number || 0) === i + 1);
     let p;
     if (issue.staticPages) {
       const s = issue.staticPages[i];
@@ -126,6 +171,15 @@
         src: preview ? (s.src || s.hi) : (s.hi || s.src),
         hi: s.hi || s.src, w: s.w || 792, h: s.h || 1224, alt: s.alt || alt
       }) : Promise.reject(new Error("Missing page"));
+    } else if (slot && (slot.file_type || "").toLowerCase() === "pdf") {
+      p = renderPdfPage(issue, i, alt, preview, slot);
+    } else if (slot) {
+      p = withTimeout(ensurePageSlotUrl(issue, slot).then((url) => new Promise((res, rej) => {
+        const im = new Image();
+        im.onload = () => res({ src: url, hi: url, w: im.naturalWidth, h: im.naturalHeight, alt });
+        im.onerror = () => rej(new Error("Issue page image failed to load"));
+        im.src = url;
+      })), PAGE_TIMEOUT, "loading issue page image");
     } else if (issue.fileType === "pdf") {
       p = renderPdfPage(issue, i, alt, preview);
     } else {
@@ -140,10 +194,11 @@
     return cache[i];
   }
 
-  async function renderPdfPage(issue, i, alt, preview) {
+  async function renderPdfPage(issue, i, alt, preview, slot) {
     return withTimeout((async () => {
-      const doc = await pdfDoc(issue);
-      const page = await doc.getPage(i + 1);
+      const doc = slot ? await pdfDocForSlot(issue, slot) : await pdfDoc(issue);
+      const sourcePage = slot ? Math.max(1, +slot.source_page || 1) : i + 1;
+      const page = await doc.getPage(sourcePage);
       const base = page.getViewport({ scale: 1 });
       const targetWidth = preview ? 720 : 1500;
       const scale = M.clamp(targetWidth / base.width, 0.65, 3);
@@ -178,9 +233,20 @@
       if (!isLive()) return { issues: bundled(), mode: "demo" };
       try {
         const c = await withTimeout(getClient(), 8000, "client");
-        const { data, error } = await withTimeout(
-          c.from("issues").select("*").eq("status", "published").order("year", { ascending: true }).order("month", { ascending: true }),
+        let data, error;
+        const nested = await withTimeout(
+          c.from("issues").select("*, issue_pages(*)").eq("status", "published").order("year", { ascending: true }).order("month", { ascending: true }),
           9000, "query");
+        data = nested.data; error = nested.error;
+        if (error) {
+          // Keep older Supabase projects readable until the new migration has been applied.
+          const legacy = await withTimeout(
+            c.from("issues").select("*").eq("status", "published").order("year", { ascending: true }).order("month", { ascending: true }),
+            9000, "legacy query");
+          if (legacy.error) throw legacy.error;
+          data = (legacy.data || []).map((row) => Object.assign({}, row, { issue_pages: [] }));
+          error = null;
+        }
         if (error) throw error;
         const issues = (data || []).map(normalise);
         // Do not block the first paint while counting PDF pages. Admin uploads store
