@@ -53,6 +53,9 @@
       filePath: raw.file_path || null,    // storage path (live mode)
       staticPages: Array.isArray(raw.pages) && raw.pages.length ? raw.pages : (Array.isArray(raw.static_pages) && raw.static_pages.length ? raw.static_pages : null),
       pageCount: raw.page_count || (raw.pages && raw.pages.length) || (raw.static_pages && raw.static_pages.length) || 0,
+      displayPageCount: raw.display_page_count != null
+        ? M.clamp(+raw.display_page_count || 1, 1, 2)
+        : (raw.spread ? 2 : M.clamp(+raw.page_count || 1, 1, 2)),
       // Data-driven spread: { left:{enabled,blocks}, right:{enabled,blocks} }.
       // When present this is what actually renders (see js/binder.js) — the
       // issue always occupies exactly one physical spread (pageIndex 0 =
