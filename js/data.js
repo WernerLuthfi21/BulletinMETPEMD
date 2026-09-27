@@ -165,16 +165,16 @@
     const alt = issue.label + " bulletin — " + (issue.title ? issue.title + ", " : "") + "page " + (i + 1);
     const slot = issue.pageSlots && issue.pageSlots.find((p) => (+p.page_number || 0) === i + 1);
     let p;
-    if (issue.staticPages) {
+    if (slot && (slot.file_type || "").toLowerCase() === "pdf") {
+      p = renderPdfPage(issue, i, alt, preview, slot);
+    } else if (slot) {
+      p = loadStoredImagePage(issue, slot, alt);
+    } else if (issue.staticPages) {
       const s = issue.staticPages[i];
       p = s ? Promise.resolve({
         src: preview ? (s.src || s.hi) : (s.hi || s.src),
         hi: s.hi || s.src, w: s.w || 792, h: s.h || 1224, alt: s.alt || alt
-      }) : Promise.reject(new Error("Missing page"));
-    } else if (slot && (slot.file_type || "").toLowerCase() === "pdf") {
-      p = renderPdfPage(issue, i, alt, preview, slot);
-    } else if (slot) {
-      p = loadStoredImagePage(issue, slot, alt);
+      }) : Promise.reject(new Error("Missing bundled page"));
     } else if (issue.fileType === "pdf") {
       p = renderPdfPage(issue, i, alt, preview);
     } else {
