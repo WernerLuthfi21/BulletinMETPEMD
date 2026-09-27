@@ -213,7 +213,8 @@
       const canvas = document.createElement("canvas");
       canvas.width = Math.round(vp.width);
       canvas.height = Math.round(vp.height);
-      await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      await page.render({ canvasContext: context, viewport: vp }).promise;
       const blob = await new Promise((res) => canvas.toBlob((b) => (b ? res(b) : canvas.toBlob(res, "image/jpeg", 0.84)), "image/webp", preview ? 0.78 : 0.88));
       const url = URL.createObjectURL(blob);
       return { src: url, hi: url, w: canvas.width, h: canvas.height, alt };
