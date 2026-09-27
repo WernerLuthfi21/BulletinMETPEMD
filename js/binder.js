@@ -631,6 +631,19 @@
     updateTurnProgress(sheet, e, dir);
   }
 
+  function updateTurnLighting(sheet, p) {
+    // All cinematic lighting derives from the exact eased rotation progress.
+    // peak = 1 at 90deg, 0 at the two end positions.
+    const peak = Math.sin(Math.PI * p);
+    const edge = 1 - peak;
+    const sweep = (p * 2 - 1) * 58;
+    sheet.host.style.setProperty("--page-light-opacity", (0.05 + peak * 0.30).toFixed(3));
+    sheet.host.style.setProperty("--page-fold-opacity", (0.06 + edge * 0.30).toFixed(3));
+    sheet.host.style.setProperty("--page-sheen-x", sweep.toFixed(2) + "%");
+    binderEl.style.setProperty("--turn-cast-opacity", (peak * 0.22).toFixed(3));
+    binderEl.style.setProperty("--turn-cast-scale", (0.92 + peak * 0.12).toFixed(3));
+  }
+
   function updateTurnProgress(sheet, progress, dir) {
     const p = M.clamp(progress, 0, 1);
     // Mobile always folds the visible sheet leftward over the left hinge.
@@ -649,6 +662,7 @@
       "rotateX(" + pitch.toFixed(3) + "deg)";
     sheet.frontShade.style.opacity = String(Math.min(.5, curl * .52));
     sheet.backShade.style.opacity = String(Math.min(.38, curl * .42));
+    updateTurnLighting(sheet, p);
   }
 
   function makeTurnUnderlay(node, left, width) {
@@ -775,6 +789,8 @@
         if (underlay) underlay.remove();
         sheet.host.remove();
         binderEl.removeAttribute("data-turning");
+        binderEl.style.setProperty("--turn-cast-opacity", "0");
+        binderEl.style.setProperty("--turn-cast-scale", "0.92");
         slotL.style.visibility = "";
         slotR.style.visibility = "";
         flipping = false;
@@ -1164,6 +1180,9 @@
       lid.style.setProperty("--lid-light-y", Math.round(12 + arc * 10) + "%");
 
       if (frontShade) frontShade.style.opacity = String(Math.min(.34, arc * .34));
+      lid.style.setProperty("--cover-light", (0.06 + Math.sin(Math.PI * eased) * 0.28).toFixed(3));
+      lid.style.setProperty("--cover-fold-shadow", (0.06 + (1 - Math.sin(Math.PI * eased)) * 0.24).toFixed(3));
+      lid.style.setProperty("--cover-sheen-x", ((eased * 2 - 1) * 52).toFixed(2) + "%");
       if (lidRevealPage) {
         const rp = M.clamp((eased - 0.48) / 0.44, 0, 1);
         const re = rp * rp * (3 - 2 * rp);
@@ -1196,6 +1215,9 @@
         }, 18);
       }
       lid.style.pointerEvents = "none";
+      lid.style.setProperty("--cover-light", "0");
+      lid.style.setProperty("--cover-fold-shadow", "0");
+      lid.style.setProperty("--cover-sheen-x", "0%");
       lid.style.transform =
         "translate3d(0,0,0) rotateY(-178deg) rotateX(0deg)";
     }
@@ -1257,6 +1279,9 @@
       lid.style.setProperty("--lid-light-y", Math.round(12 + arc * 10) + "%");
 
       if (frontShade) frontShade.style.opacity = String(Math.min(.34, arc * .34));
+      lid.style.setProperty("--cover-light", (0.06 + Math.sin(Math.PI * eased) * 0.28).toFixed(3));
+      lid.style.setProperty("--cover-fold-shadow", (0.06 + (1 - Math.sin(Math.PI * eased)) * 0.24).toFixed(3));
+      lid.style.setProperty("--cover-sheen-x", ((eased * 2 - 1) * 52).toFixed(2) + "%");
       if (lidRevealPage) {
         const rp = M.clamp((0.70 - eased) / 0.46, 0, 1);
         const re = rp * rp * (3 - 2 * rp);
@@ -1278,6 +1303,9 @@
       if (lidRevealPage) lidRevealPage.style.opacity = "0";
       lid.style.transition = "none";
       lid.style.opacity = "1";
+      lid.style.setProperty("--cover-light", "0");
+      lid.style.setProperty("--cover-fold-shadow", "0");
+      lid.style.setProperty("--cover-sheen-x", "0%");
       lid.style.transform =
         "translate3d(0,0,0) rotateY(0deg) rotateX(0deg)";
     }
