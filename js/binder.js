@@ -989,8 +989,18 @@
   /* ---------- opening / closing animation ---------- */
   const lid = document.getElementById("lid");
   const stickerEl = document.querySelector(".sticker");
+  const lidFront = lid.querySelector(".lid-face.front");
+  const lidShade = lidFront.querySelector(".shade");
+  const lidBackShade = lid.querySelector(".lid-face.back .shade");
+  const paperEdge = lid.querySelector(".lid-paper-edge");
   let coverMotion = false;
   let currentSpreadReady = false;
+  let openProgress = 0;
+  let openTarget = 0;
+  let openingFrame = 0;
+  let openingLastTime = 0;
+  let openingReady = false;
+  let motionClosedX = 0;
 
   function closedBinderX() {
     if (B.single) return 0;
@@ -1001,8 +1011,11 @@
     return -((lw + ms) / 2) + tabsGutter / 2;
   }
 
-  function setBinderX(x) {
-    binderEl.style.transform = "translate3d(" + x.toFixed(2) + "px,0,0) rotate(-.35deg)";
+  function setBinderPose(progress, closedX) {
+    const x = B.single ? 0 : closedX * (1 - progress);
+    const yaw = B.single ? 360 * progress : 0;
+    binderEl.style.transform =
+      "translate3d(" + x.toFixed(2) + "px,0,0) rotate(-.35deg) rotateY(" + yaw.toFixed(3) + "deg)";
     tabsEl.style.transform = B.single ? "" : "translateX(" + x.toFixed(2) + "px)";
   }
 
@@ -1010,92 +1023,140 @@
     lid.style.transformOrigin = B.single ? "calc(var(--ms) + 16px) center" : "left center";
   }
 
-  function setCoverPose(progress, opening) {
-    const p = M.clamp(progress, 0, 1);
-    const e = .5 - .5 * Math.cos(Math.PI * p);
-    const angle = opening ? -180 * e : -180 * (1 - e);
-    const lift = Math.sin(Math.PI * e) * 3.5;
-    lid.style.transform = "translateZ(" + lift.toFixed(2) + "px) rotateY(" + angle.toFixed(3) + "deg)";
-    const frontFacing = angle > -90;
-    lid.querySelector(".lid-face.front").style.visibility = frontFacing ? "visible" : "hidden";
-    lid.querySelector(".lid-face.back").style.visibility = frontFacing ? "hidden" : "visible";
-    return e;
+  function setSpreadClipPose(progress) {
+    const clipped = 50 * (1 - progress);
+    spreadEl.style.clipPath = "inset(0 0 0 " + clipped.toFixed(3) + "%)";
   }
 
-  // The first spread is a separate physical sheet lying just behind the
-  // cover, sharing the same hinge line (see .slot.left/.slot.right
-  // transform-origin in site.css). It is driven from the SAME eased
-  // progress value `e` that setCoverPose just computed for the lid, in the
-  // same animation frame, rather than a separately-timed CSS animation:
-  // that is what keeps it visually attached to the cover instead of
-  // looking like an unrelated visibility toggle. PAGE_LAG makes the sheet
-  // start following slightly after the cover (a thinner, lighter layer
-  // stacked underneath), and it always finishes flat exactly when the
-  // cover finishes its own motion, because both read off the same `e`.
-  // The spread must never be more "open" than the cover's own progress
-  // allows, or the first page flashes fully into view before the cover has
-  // actually rotated (this was reported as "page 1 already showing before
-  // the cover moves"). Instead of toggling clip-path via a CSS class the
-  // instant the motion starts, we write it inline every frame from the same
-  // `e` that drives setCoverPose, so it can only ever be exactly as open as
-  // the cover currently is — never more, never less, at any point in time.
-  function setSpreadClipPose(e, opening) {
-    const pct = opening ? 50 * (1 - e) : 50 * e;
-    spreadEl.style.clipPath = pct > 0.05 ? "inset(0 0 0 " + pct.toFixed(2) + "%)" : "";
-  }
-
-  const PAGE_TILT_DEG = 58;
-  const PAGE_LAG = 0.14;
-  function setPageOpenPose(e, opening) {
-    const p2 = M.clamp((e - PAGE_LAG) / (1 - PAGE_LAG), 0, 1);
-    const pe = .5 - .5 * Math.cos(Math.PI * p2);
-    const amount = opening ? (1 - pe) : pe;
-    const lift = Math.sin(Math.PI * pe) * 4;
-    const leftLeaf = slotL.querySelector(".leaf");
-    const rightLeaf = slotR.querySelector(".leaf");
+  const CLOSED_PAGE_ANGLE = 180;
+  const COVER_FRONT_DEPTH = 8;
+  const COVER_BACK_DEPTH = -10;
+  function setPageOpenPose(progress) {
+    const angle = CLOSED_PAGE_ANGLE * (1 - progress);
+    const lift = Math.sin(Math.PI * progress) * 4;
+    const leftLeaf = leafNode(slotL);
+    const rightLeaf = leafNode(slotR);
     if (leftLeaf) {
-      leftLeaf.style.transform = amount > 0.001
-        ? "translateZ(" + lift.toFixed(2) + "px) rotateY(" + (PAGE_TILT_DEG * amount).toFixed(3) + "deg)"
-        : "";
-      leftLeaf.style.filter = amount > 0.001 ? "brightness(" + (1 - amount * .12).toFixed(3) + ")" : "";
+      leftLeaf.style.transform =
+        "translateZ(" + lift.toFixed(2) + "px) rotateY(" + (-angle).toFixed(3) + "deg)";
+      leftLeaf.style.filter = "brightness(" + (1 - (1 - progress) * .12).toFixed(3) + ")";
     }
     if (rightLeaf) {
-      rightLeaf.style.transform = amount > 0.001
-        ? "translateZ(" + lift.toFixed(2) + "px) rotateY(" + (-PAGE_TILT_DEG * amount).toFixed(3) + "deg)"
-        : "";
-      rightLeaf.style.filter = amount > 0.001 ? "brightness(" + (1 - amount * .12).toFixed(3) + ")" : "";
+      rightLeaf.style.transform =
+        "translateZ(" + lift.toFixed(2) + "px) rotateY(" + angle.toFixed(3) + "deg)";
+      rightLeaf.style.filter = "brightness(" + (1 - (1 - progress) * .12).toFixed(3) + ")";
     }
   }
 
-  function animateCover(opening, fromX, toX) {
-    return new Promise((resolve) => {
-      const shade = lid.querySelector(".front .shade");
-      let start = null;
-      function frame(ts) {
-        if (start == null) start = ts;
-        const p = M.clamp((ts - start) / OPEN_MS, 0, 1);
-        const e = setCoverPose(p, opening);
-        setSpreadClipPose(e, opening);
-        setPageOpenPose(e, opening);
-        setBinderX(fromX + (toX - fromX) * e);
-        paintPaperMotion(p);
-        if (shade) shade.style.opacity = String(Math.min(.50, Math.sin(Math.PI * e) * .58));
-        if (p < 1) requestAnimationFrame(frame);
-        else resolve();
-      }
+  function renderOpeningPose(progress, closedX) {
+    // One eased progress drives the cover, folded page leaves, reveal, depth,
+    // desk alignment, and mobile's full assembly turn. At mobile 360 degrees
+    // the assembly returns to face the reader while its cover remains hinged open.
+    const p = .5 - .5 * Math.cos(Math.PI * M.clamp(progress, 0, 1));
+    const coverAngle = -180 * p;
+    const coverDepth = COVER_FRONT_DEPTH + (COVER_BACK_DEPTH - COVER_FRONT_DEPTH) * p;
+    lid.style.transform =
+      "translateZ(" + coverDepth.toFixed(2) + "px) rotateY(" + coverAngle.toFixed(3) + "deg)";
+    setBinderPose(p, closedX);
+    setSpreadClipPose(p);
+    setPageOpenPose(p);
+    paintPaperMotion(p);
+    const shade = Math.sin(Math.PI * p);
+    lidShade.style.opacity = String(Math.min(.5, shade * .58));
+    lidBackShade.style.opacity = String(Math.min(.4, shade * .46));
+  }
 
-      if (M.reducedMotion()) {
-        setCoverPose(1, opening);
-        setSpreadClipPose(1, opening);
-        setPageOpenPose(1, opening);
-        setBinderX(toX);
-        paintPaperMotion(0);
-        if (shade) shade.style.opacity = "0";
-        resolve();
-      } else {
-        requestAnimationFrame(frame);
-      }
-    });
+  function settleCover(open) {
+    openProgress = open ? 1 : 0;
+    renderOpeningPose(openProgress, motionClosedX);
+    B.opened = open;
+    binderEl.setAttribute("data-state", open ? "open" : "closed");
+    binderEl.removeAttribute("data-motion");
+    lid.style.pointerEvents = open ? "none" : "auto";
+    lid.setAttribute("aria-expanded", open ? "true" : "false");
+    lid.setAttribute("aria-label", open ? "Close the binder" : "Open the binder");
+    coverMotion = false;
+    openingFrame = 0;
+    openingLastTime = 0;
+  }
+
+  function failCoverMotion(error) {
+    console.error("[METP] binder cover motion failed", error);
+    openTarget = B.opened ? 1 : 0;
+    if (!B.opened) {
+      openProgress = 0;
+      renderOpeningPose(0, motionClosedX);
+      binderEl.setAttribute("data-state", "closed");
+    }
+    binderEl.removeAttribute("data-motion");
+    lid.style.pointerEvents = B.opened ? "none" : "auto";
+    coverMotion = false;
+    openingFrame = 0;
+    openingLastTime = 0;
+  }
+
+  function runOpeningFrame(ts) {
+    openingFrame = 0;
+    if (!openingLastTime) openingLastTime = ts;
+    const elapsed = Math.min(64, ts - openingLastTime);
+    openingLastTime = ts;
+
+    if (M.reducedMotion()) {
+      openProgress = openTarget;
+    } else {
+      const step = elapsed / OPEN_MS;
+      if (openTarget > openProgress) openProgress = Math.min(openTarget, openProgress + step);
+      else openProgress = Math.max(openTarget, openProgress - step);
+    }
+    renderOpeningPose(openProgress, motionClosedX);
+
+    if (openProgress === openTarget) {
+      settleCover(openTarget === 1);
+      return;
+    }
+    openingFrame = requestAnimationFrame(runOpeningFrame);
+  }
+
+  function startOpeningMotion() {
+    if (openingFrame) return;
+    openingLastTime = 0;
+    openingFrame = requestAnimationFrame(runOpeningFrame);
+  }
+
+  function requestCoverState(open) {
+    const target = open ? 1 : 0;
+    if (coverMotion) {
+      if (target === openTarget) return;
+      openTarget = target;
+      binderEl.setAttribute("data-motion", open ? "opening" : "closing");
+      if (!M.reducedMotion()) M.sound && (open ? M.sound.open() : M.sound.close());
+      if (openingFrame) return;
+      if (openingReady) startOpeningMotion();
+      return;
+    }
+    if (target === (B.opened ? 1 : 0) || flipping || navigationBusy) return;
+
+    coverMotion = true;
+    openTarget = target;
+    motionClosedX = closedBinderX();
+    binderEl.setAttribute("data-motion", open ? "opening" : "closing");
+    setCoverHinge();
+    lid.style.pointerEvents = "auto";
+    if (!M.reducedMotion()) M.sound && (open ? M.sound.open() : M.sound.close());
+
+    if (!open || currentSpreadReady) {
+      openingReady = true;
+      startOpeningMotion();
+      return;
+    }
+
+    openingReady = false;
+    waitForCurrentSpread().then((ready) => {
+      if (!ready) throw new Error("Current spread is not ready");
+      openingReady = true;
+      if (openTarget === 0 && openProgress === 0) settleCover(false);
+      else startOpeningMotion();
+    }).catch(failCoverMotion);
   }
 
   async function waitForCurrentSpread() {
@@ -1107,128 +1168,21 @@
   }
 
   function paintPaperMotion(progress) {
-    const p = M.clamp(progress, 0, 1);
-    const s = Math.sin(Math.PI * (.5 - .5 * Math.cos(Math.PI * p)));
-    const edge = lid.querySelector(".lid-paper-edge");
-    if (edge) edge.style.opacity = String(Math.min(.82, s * .82));
+    const edge = paperEdge;
+    if (edge) edge.style.opacity = String(Math.min(.82, Math.sin(Math.PI * progress) * .82));
   }
 
   function openBinder() {
-    if (B.opened || coverMotion || flipping || navigationBusy) return;
-    coverMotion = true;
-    forceCoverPaint();
-
-    const closedX = closedBinderX();
-    binderEl.setAttribute("data-state", "closed");
-    setBinderX(closedX);
-    lid.style.visibility = "visible";
-    lid.style.opacity = "1";
-    lid.style.pointerEvents = "none";
-    setCoverHinge();
-    setCoverPose(0, true);
-    setSpreadClipPose(0, true);
-    setPageOpenPose(0, true);
-    paintPaperMotion(0);
-
-    const ready = currentSpreadReady ? Promise.resolve(true) : waitForCurrentSpread();
-    ready.then((ok) => {
-      if (!ok) {
-        renderSpreadCore();
-        throw new Error("Current spread is not ready");
-      }
-      if (!M.reducedMotion()) M.sound && M.sound.open();
-      binderEl.setAttribute("data-motion", "opening");
-      setBinderX(closedX);
-      return animateCover(true, closedX, 0);
-    }).then(() => {
-      B.opened = true;
-      binderEl.setAttribute("data-state", "open");
-      binderEl.removeAttribute("data-motion");
-      setBinderX(0);
-      lid.style.opacity = "0";
-      lid.style.visibility = "hidden";
-      lid.style.pointerEvents = "none";
-      setCoverPose(1, true);
-      setSpreadClipPose(1, true);
-      setPageOpenPose(1, true);
-      lid.style.transform = "rotateY(-180deg)";
-      paintPaperMotion(0);
-      coverMotion = false;
-    }).catch((e) => {
-      console.error("[METP] binder open failed", e);
-      setBinderX(closedX);
-      binderEl.setAttribute("data-state", "closed");
-      binderEl.removeAttribute("data-motion");
-      setCoverPose(0, true);
-      setSpreadClipPose(0, true);
-      setPageOpenPose(0, true);
-      lid.style.opacity = "1";
-      lid.style.visibility = "visible";
-      lid.style.pointerEvents = "";
-      paintPaperMotion(0);
-      coverMotion = false;
-    });
-  }
-
-  function forceCoverPaint() {
-    lid.style.display = "block";
-    lid.style.visibility = "visible";
-    void lid.offsetWidth;
+    requestCoverState(true);
   }
 
   function closeBinder() {
-    if (!B.opened || coverMotion || flipping || navigationBusy) return;
-    coverMotion = true;
-    forceCoverPaint();
-    M.sound && M.sound.close();
-
-    const closedX = closedBinderX();
-
-    binderEl.setAttribute("data-state", "open");
-    binderEl.setAttribute("data-motion", "closing");
-    setBinderX(0);
-
-    lid.style.visibility = "visible";
-    lid.style.opacity = "1";
-    lid.style.pointerEvents = "none";
-    setCoverHinge();
-    setCoverPose(0, false);
-    setSpreadClipPose(0, false);
-    setPageOpenPose(0, false);
-    paintPaperMotion(0);
-
-    animateCover(false, 0, closedX).then(() => {
-        B.opened = false;
-        binderEl.setAttribute("data-state", "closed");
-        binderEl.removeAttribute("data-motion");
-        setBinderX(closedX);
-        setCoverPose(1, false);
-        setSpreadClipPose(1, false);
-        setPageOpenPose(1, false);
-        lid.style.transform = "rotateY(0deg)";
-        lid.style.opacity = "1";
-        lid.style.visibility = "visible";
-        lid.style.pointerEvents = "";
-        lid.setAttribute("tabindex", "0");
-        paintPaperMotion(0);
-        coverMotion = false;
-    }).catch((error) => {
-      console.error("[METP] binder close failed", error);
-      setBinderX(0);
-      binderEl.setAttribute("data-state", "open");
-      binderEl.removeAttribute("data-motion");
-      setCoverPose(1, true);
-      setSpreadClipPose(1, true);
-      setPageOpenPose(1, true);
-      lid.style.opacity = "0";
-      lid.style.visibility = "hidden";
-      lid.style.pointerEvents = "none";
-      coverMotion = false;
-    });
+    requestCoverState(false);
   }
 
   lid.addEventListener("click", (e) => {
-    if (B.opened) closeBinder();
+    if (coverMotion) requestCoverState(openTarget === 1 ? false : true);
+    else if (B.opened) closeBinder();
     else openBinder();
   });
 
@@ -1254,7 +1208,15 @@
     });
   }
   lid.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openBinder(); }
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      if (coverMotion) requestCoverState(openTarget === 1 ? false : true);
+      else if (B.opened) closeBinder();
+      else openBinder();
+    }
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && coverMotion) requestCoverState(openTarget === 1 ? false : true);
   });
   document.getElementById("lidOpen").addEventListener("click", (e) => { e.stopPropagation(); openBinder(); });
   if (stickerEl) {
@@ -1279,13 +1241,9 @@
     B.selectedIssueId = B.issues[B.issues.length - 1].id;
     renderSpread();
     renderTabs();
-    // The binder markup starts at data-state="closed", but nothing had ever
-    // positioned the spread at its closed offset before the first open/close
-    // animation ran. That left the two-page spread sitting at its "open"
-    // translate(0,0) position from first paint, with only the cover's opacity
-    // making it look closed — so the left leaf was visible right alongside
-    // the still-opaque cover instead of being tucked out of view.
-    if (!B.opened) setBinderX(closedBinderX());
+    motionClosedX = closedBinderX();
+    setCoverHinge();
+    renderOpeningPose(openProgress, motionClosedX);
     // Warm the visible spread immediately. Opening is allowed to animate only
     // after this promise resolves, so the first open frame cannot be blank.
     waitForCurrentSpread();
@@ -1317,17 +1275,15 @@
       }
       if (single === B.single) {
         // Recompute the desktop cover offset when the leaf width changes within the same mode.
-        if (!single && !B.opened && binderEl.dataset.state === "closed") setBinderX(closedBinderX());
+        if (!single && !B.opened && binderEl.dataset.state === "closed") {
+          motionClosedX = closedBinderX();
+          renderOpeningPose(openProgress, motionClosedX);
+        }
         return;
       }
       const curPage = (B.spreads[B.cur] || []).find(Boolean) || null;
       B.single = single;
       binderEl.setAttribute("data-mode", single ? "single" : "dual");
-      if (B.opened) setBinderX(0);
-      else {
-        binderEl.style.transform = "";
-        tabsEl.style.transform = "";
-      }
       const m = buildModel(B.issues, single);
       B.pages = m.pages;
       B.spreads = m.spreads;
@@ -1340,6 +1296,9 @@
       }
       B.cur = newCur;
       renderSpread();
+      motionClosedX = closedBinderX();
+      setCoverHinge();
+      renderOpeningPose(openProgress, motionClosedX);
       warmSpread(B.spreads[B.cur]);
       warmSpread(B.spreads[B.cur - 1]);
       warmSpread(B.spreads[B.cur + 1]);
@@ -1389,6 +1348,8 @@
     const idx = B.issues.findIndex((i) => i.id === B.selectedIssueId);
     B.cur = idx >= 0 ? firstSpreadOfIssue(idx) : Math.max(0, B.spreads.length - 1);
     renderSpread();
+    motionClosedX = closedBinderX();
+    renderOpeningPose(openProgress, motionClosedX);
     warmSpread(B.spreads[B.cur]);
     const warmAdjacent = () => {
       warmSpread(B.spreads[B.cur - 1]);
