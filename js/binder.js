@@ -116,7 +116,7 @@
   function buildModel(issues, single) {
     const pages = [];
     issues.forEach((issue, idx) => {
-      const n = issue.pageCount || 1;
+      const n = M.clamp(issue.displayPageCount || issue.pageCount || 1, 1, 2);
       for (let p = 0; p < n; p++) pages.push({ issue, pageIndex: p, isFirst: p === 0, isLast: p === n - 1, issueIdx: idx });
     });
     const nx = nextIssueLabel(issues);
@@ -463,9 +463,9 @@
 
     if (curPage) {
       const pageSuffix = curPage.issue.displayPageCount > 1 ? " #" + (curPage.pageIndex + 1) : "";
-      issueTitleEl.textContent = curPage.issue.label + (curPage.issue.title ? " \u2014 " + curPage.issue.title : "");
+      issueTitleEl.textContent = curPage.issue.label + pageSuffix + (curPage.issue.title ? " \u2014 " + curPage.issue.title : "");
       btnOriginal.hidden = false;
-      curPage.issue.getUrl().then((u) => (btnOriginal.href = u)).catch(() => { btnOriginal.hidden = true; });
+      curPage.issue.getUrl(curPage.pageIndex).then((u) => (btnOriginal.href = u)).catch(() => { btnOriginal.hidden = true; });
       // Block-based pages (data-driven spread content) have no page image to
       // zoom into, so "Read" (the reader's zoom view) doesn't apply to them.
       btnRead.hidden = !!curPage.issue.spread;
