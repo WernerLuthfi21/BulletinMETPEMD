@@ -205,10 +205,8 @@ img{max-width:100%}
 .slot.empty{visibility:hidden;box-shadow:none}
 
 .binder[data-state="open"] .spread{z-index:8}
-.binder[data-state="open"] .cover.left,
-.binder[data-state="open"] .cover.right,
 .binder[data-cover-opening="true"] .cover.left,
-.binder[data-cover-opening="true"] .cover.right{
+.binder[data-cover-opening="true"] .slot.left{
   opacity:0!important;visibility:hidden!important;
 }
 .spread-page-tags{
