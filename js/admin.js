@@ -116,9 +116,13 @@
   function fmtIssue(row) { return MONTHS[row.month - 1].slice(0, 3) + " " + row.year; }
 
   async function loadIssues() {
-    const { data, error } = await supa.from("issues").select("*").order("year", { ascending: false }).order("month", { ascending: false });
-    if (error) { toast("Couldn\u2019t load issues: " + error.message, true); return; }
-    issues = data || [];
+    let res = await supa.from("issues").select("*, issue_pages(*)").order("year", { ascending: false }).order("month", { ascending: false });
+    if (res.error) {
+      res = await supa.from("issues").select("*").order("year", { ascending: false }).order("month", { ascending: false });
+      if (!res.error) res.data = (res.data || []).map((row) => Object.assign({}, row, { issue_pages: [] }));
+    }
+    if (res.error) { toast("Couldn’t load issues: " + res.error.message, true); return; }
+    issues = res.data || [];
     renderIssues();
   }
 
@@ -131,7 +135,8 @@
       tr.appendChild(el("td", { text: fmtIssue(row) }));
       tr.appendChild(el("td", { text: row.title || "\u2014" }));
       tr.appendChild(el("td", {}, [el("span", { class: "status-chip " + row.status, text: row.status })]));
-      tr.appendChild(el("td", { text: row.page_count ? String(row.page_count) : "\u2014" }));
+      const displayed = Math.max(1, Math.min(2, +row.display_page_count || (Array.isArray(row.issue_pages) && row.issue_pages.length ? row.issue_pages.length : 1)));
+      tr.appendChild(el("td", { text: displayed === 2 ? "2 · #1 + #2" : "1 · #1" }));
       tr.appendChild(el("td", { text: row.published_at ? new Date(row.published_at).toLocaleDateString() : "\u2014" }));
       const actions = el("div", { class: "row-actions" });
       const editBtn = el("button", { class: "btn sm", type: "button", text: "Edit" });
@@ -157,13 +162,13 @@
 
   $("#newIssueBtn").addEventListener("click", () => openIssueDialog(null));
 
-  let pendingUpload = null; // { file, path } chosen but not yet saved to the row
-  let uploadedThisSession = null; // { path, type, pageCount } once uploaded
+  let pendingUploads = { 1: null, 2: null }; // { path, type, pageCount } by logical page
+  let currentIssueRow = null
 
   function openIssueDialog(row) {
     currentIssueId = row ? row.id : null;
-    pendingUpload = null;
-    uploadedThisSession = null;
+    currentIssueRow = row || null;
+    pendingUploads = { 1: null, 2: null };
     $("#issueDialogTitle").textContent = row ? "Edit issue" : "New issue";
     $("#issueDelete").hidden = !row;
     $("#issueFormMsg").textContent = "";
@@ -175,11 +180,12 @@
     $("#fEditorChief").value = row ? row.editor_chief || "" : "";
     $("#fEditors").value = row ? (row.editors || []).join(", ") : "";
     $("#fContributors").value = row ? (row.contributors || []).join(", ") : "";
-    $("#fDisplayPageCount").value = String(row && row.display_page_count ? row.display_page_count : 2);
+    $("#fDisplayPageCount").value = String(row && row.display_page_count ? row.display_page_count : 1);
     $("#fPublished").checked = row ? row.status === "published" : false;
     $("#maxMbLabel").textContent = cfg.maxUploadMB || 25;
     renderHighlights(row && row.highlights ? row.highlights : []);
-    updateUploadZone(row);
+    renderPageUploadZones(row);
+    syncPageUploadVisibility();
     $("#issueDialog").showModal();
   }
   function closeIssueDialog() { $("#issueDialog").close(); }
@@ -223,52 +229,135 @@
     })).filter((h) => h.heading || h.text);
   }
 
-  /* ---- file upload (drag & drop + picker), with real progress via XHR ---- */
-  const zone = $("#uploadZone"), fileInput = $("#fileInput");
-  zone.addEventListener("click", () => fileInput.click());
-  zone.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInput.click(); } });
-  ["dragenter", "dragover"].forEach((ev) => zone.addEventListener(ev, (e) => { e.preventDefault(); zone.classList.add("drag"); }));
-  ["dragleave", "drop"].forEach((ev) => zone.addEventListener(ev, (e) => { e.preventDefault(); zone.classList.remove("drag"); }));
-  zone.addEventListener("drop", (e) => { const f = e.dataTransfer.files[0]; if (f) handleFile(f); });
-  fileInput.addEventListener("change", () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+  /* ---- page asset upload (one independent file for logical page #1/#2) ---- */
+  function pageEls(page) {
+    return {
+      zone: $("#uploadZone" + page),
+      input: $("#fileInput" + page),
+      idle: $("#uploadIdle" + page),
+      current: $("#uploadCurrent" + page),
+      currentName: $("#uploadCurrentName" + page),
+      progress: $("#uploadProgress" + page),
+      fill: $("#uploadBarFill" + page),
+      status: $("#uploadStatus" + page),
+      msg: $("#uploadMsg" + page)
+    };
+  }
+
+  function issuePage(row, page) {
+    return Array.isArray(row && row.issue_pages)
+      ? row.issue_pages.find((item) => +item.page_number === page) || null
+      : null;
+  }
+
+  function renderPageUploadZones(row) {
+    [1, 2].forEach((page) => {
+      const els = pageEls(page);
+      const existing = issuePage(row, page);
+      const legacy = page === 1 && !existing && row && row.file_path
+        ? { file_path: row.file_path, file_type: row.file_type }
+        : null;
+      els.progress.hidden = true;
+      els.fill.style.width = "0%";
+      if (existing || legacy) {
+        els.idle.hidden = true;
+        els.current.hidden = false;
+        els.currentName.textContent = (existing || legacy).file_path.split("/").pop();
+        els.current.querySelector("span").textContent = existing
+          ? "already uploaded — drop a new file to replace page #" + page
+          : "legacy issue file — upload a page-specific file to take over page #1";
+      } else {
+        els.idle.hidden = false;
+        els.current.hidden = true;
+      }
+      els.msg.textContent = "";
+      els.msg.className = "msg";
+    });
+    $$(".maxMbLabel").forEach((n) => (n.textContent = cfg.maxUploadMB || 50));
+  }
+
+  function syncPageUploadVisibility() {
+    $("#pageUploadSlot2").hidden = +$("#fDisplayPageCount").value !== 2;
+  }
+
+  [1, 2].forEach((page) => {
+    const els = pageEls(page);
+    els.zone.addEventListener("click", () => els.input.click());
+    els.zone.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); els.input.click(); }
+    });
+    ["dragenter", "dragover"].forEach((ev) => els.zone.addEventListener(ev, (e) => {
+      e.preventDefault(); els.zone.classList.add("drag");
+    }));
+    ["dragleave", "drop"].forEach((ev) => els.zone.addEventListener(ev, (e) => {
+      e.preventDefault(); els.zone.classList.remove("drag");
+    }));
+    els.zone.addEventListener("drop", (e) => {
+      const file = e.dataTransfer.files[0];
+      if (file) handlePageFile(page, file);
+    });
+    els.input.addEventListener("change", () => {
+      if (els.input.files[0]) handlePageFile(page, els.input.files[0]);
+      els.input.value = "";
+    });
+  });
+  $("#fDisplayPageCount").addEventListener("change", syncPageUploadVisibility);
 
   function extType(name) {
     const ext = (name.split(".").pop() || "").toLowerCase();
     return ["pdf", "png", "jpg", "jpeg"].includes(ext) ? ext : null;
   }
 
-  async function handleFile(file) {
-    const msg = $("#uploadMsg");
+  async function handlePageFile(page, file) {
+    const els = pageEls(page);
     const type = extType(file.name);
-    if (!type) { msg.textContent = "Please choose a PDF, PNG or JPG file."; msg.className = "msg err"; return; }
-    const maxBytes = (cfg.maxUploadMB || 25) * 1024 * 1024;
-    if (file.size > maxBytes) { msg.textContent = "That file is over the " + (cfg.maxUploadMB || 25) + " MB limit."; msg.className = "msg err"; return; }
-    msg.textContent = "";
-    const month = $("#fMonth").value.padStart(2, "0"), year = $("#fYear").value;
-    const path = year + "-" + month + "/" + Date.now() + "-" + file.name.replace(/[^a-zA-Z0-9_.-]/g, "_");
+    if (!type) {
+      els.msg.textContent = "Please choose a PDF, PNG or JPG file.";
+      els.msg.className = "msg err";
+      return;
+    }
+    const maxBytes = (cfg.maxUploadMB || 50) * 1024 * 1024;
+    if (file.size > maxBytes) {
+      els.msg.textContent = "That file is over the " + (cfg.maxUploadMB || 50) + " MB limit.";
+      els.msg.className = "msg err";
+      return;
+    }
 
-    $("#uploadIdle").hidden = true; $("#uploadCurrent").hidden = true; $("#uploadProgress").hidden = false;
-    const fill = $("#uploadBarFill"), status = $("#uploadStatus");
-    fill.style.width = "0%"; status.textContent = "Uploading\u2026";
+    const month = $("#fMonth").value.padStart(2, "0"), year = $("#fYear").value;
+    const path = year + "-" + month + "/page-" + page + "/" + Date.now() + "-" + file.name.replace(/[^a-zA-Z0-9_.-]/g, "_");
+    els.msg.textContent = "";
+    els.idle.hidden = true; els.current.hidden = true; els.progress.hidden = false;
+    els.fill.style.width = "0%"; els.status.textContent = "Uploading…";
 
     try {
-      await uploadWithProgress(path, file, (pct) => { fill.style.width = pct + "%"; status.textContent = "Uploading\u2026 " + pct + "%"; });
-      status.textContent = "Counting pages\u2026";
+      await uploadWithProgress(path, file, (pct) => {
+        els.fill.style.width = pct + "%";
+        els.status.textContent = "Uploading… " + pct + "%";
+      });
+      els.status.textContent = "Counting source pages…";
       const pageCount = await countPages(file, type);
-      uploadedThisSession = { path, type, pageCount };
-      status.textContent = "Upload complete \u2014 " + pageCount + (pageCount === 1 ? " page" : " pages");
-      msg.textContent = "Uploaded. Save the issue to keep this file.";
-      msg.className = "msg ok";
+      if (type === "pdf" && pageCount !== 1) {
+        els.progress.hidden = true; els.idle.hidden = false;
+        els.msg.textContent = "Each logical page needs a one-page PDF. This PDF has " + pageCount + " pages.";
+        els.msg.className = "msg err";
+        return;
+      }
+      pendingUploads[page] = { path, type, pageCount };
+      els.status.textContent = "Upload complete — ready as page #" + page;
+      els.current.hidden = false;
+      els.currentName.textContent = file.name;
+      els.current.querySelector("span").textContent = "new page asset — saved with the issue";
+      els.msg.textContent = "Page #" + page + " uploaded. Save the issue to keep it.";
+      els.msg.className = "msg ok";
     } catch (err) {
-      console.error("[METP admin] upload failed", err);
-      $("#uploadProgress").hidden = true;
-      $("#uploadIdle").hidden = false;
-      msg.textContent = "Upload failed \u2014 " + (err.message || "please try again.");
-      msg.className = "msg err";
-      msg.appendChild(document.createElement("br"));
+      console.error("[METP admin] page upload failed", err);
+      els.progress.hidden = true; els.idle.hidden = false;
+      els.msg.textContent = "Upload failed — " + (err.message || "please try again.");
+      els.msg.className = "msg err";
+      els.msg.appendChild(document.createElement("br"));
       const retry = el("button", { class: "btn sm", type: "button", text: "Retry" });
-      retry.addEventListener("click", () => handleFile(file));
-      msg.appendChild(retry);
+      retry.addEventListener("click", () => handlePageFile(page, file));
+      els.msg.appendChild(retry);
     }
   }
 
@@ -296,7 +385,10 @@
       const buf = await file.arrayBuffer();
       const doc = await window.pdfjsLib.getDocument({ data: buf }).promise;
       return doc.numPages;
-    } catch (e) { console.warn("[METP admin] page count failed, defaulting to 1", e); return 1; }
+    } catch (e) {
+      console.warn("[METP admin] page count failed, defaulting to 1", e);
+      return 1;
+    }
   }
   function loadScriptOnce(src) {
     return new Promise((resolve, reject) => {
@@ -311,6 +403,22 @@
     e.preventDefault();
     const msg = $("#issueFormMsg");
     const saveBtn = $("#issueSave");
+    const displayPageCount = Math.max(1, Math.min(2, +$("#fDisplayPageCount").value || 1));
+    const existingPages = Array.isArray(currentIssueRow && currentIssueRow.issue_pages) ? currentIssueRow.issue_pages : [];
+    const hasPage = (page) => !!pendingUploads[page]
+      || existingPages.some((item) => +item.page_number === page)
+      || (page === 1 && !existingPages.length && currentIssueRow && currentIssueRow.file_path);
+
+    if ($("#fPublished").checked) {
+      for (let page = 1; page <= displayPageCount; page++) {
+        if (!hasPage(page)) {
+          msg.textContent = "Published issue needs an uploaded file for page #" + page + ".";
+          msg.className = "msg err";
+          return;
+        }
+      }
+    }
+
     const payload = {
       month: +$("#fMonth").value,
       year: +$("#fYear").value,
@@ -318,27 +426,45 @@
       editor_chief: $("#fEditorChief").value.trim(),
       editors: splitList($("#fEditors").value),
       contributors: splitList($("#fContributors").value),
-      display_page_count: Math.max(1, Math.min(2, +$("#fDisplayPageCount").value || 2)),
+      display_page_count: displayPageCount,
       status: $("#fPublished").checked ? "published" : "draft",
       highlights: collectHighlights()
     };
-    if (payload.status === "published") payload.published_at = payload.published_at || new Date().toISOString();
-    if (uploadedThisSession) {
-      payload.file_path = uploadedThisSession.path;
-      payload.file_type = uploadedThisSession.type;
-      payload.page_count = uploadedThisSession.pageCount;
-    }
-    saveBtn.disabled = true; msg.textContent = "Saving\u2026"; msg.className = "msg";
+    if (payload.status === "published") payload.published_at = new Date().toISOString();
+
+    saveBtn.disabled = true; msg.textContent = "Saving…"; msg.className = "msg";
     let res;
     if (currentIssueId) res = await supa.from("issues").update(payload).eq("id", currentIssueId).select().single();
     else res = await supa.from("issues").insert(payload).select().single();
-    saveBtn.disabled = false;
     if (res.error) {
+      saveBtn.disabled = false;
       const dup = /duplicate key|unique/i.test(res.error.message);
-      msg.textContent = dup ? "An issue already exists for that month/year." : "Couldn\u2019t save: " + res.error.message;
+      msg.textContent = dup ? "An issue already exists for that month/year." : "Couldn’t save: " + res.error.message;
       msg.className = "msg err";
       return;
     }
+
+    const issueId = res.data.id;
+    for (const page of [1, 2]) {
+      const upload = pendingUploads[page];
+      if (!upload) continue;
+      const pageResult = await supa.from("issue_pages").upsert({
+        issue_id: issueId,
+        page_number: page,
+        file_path: upload.path,
+        file_type: upload.type,
+        source_page: 1,
+        source_page_count: upload.pageCount
+      }, { onConflict: "issue_id,page_number" });
+      if (pageResult.error) {
+        saveBtn.disabled = false;
+        msg.textContent = "Issue saved, but page #" + page + " could not be linked: " + pageResult.error.message;
+        msg.className = "msg err";
+        return;
+      }
+    }
+
+    saveBtn.disabled = false;
     toast("Issue saved.");
     closeIssueDialog();
     loadIssues();
