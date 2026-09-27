@@ -104,8 +104,8 @@
   dlg.addEventListener("click", (e) => { if (e.target === dlg) close(); });
   document.getElementById("rdPrev").addEventListener("click", () => setPage(pageIndex - 1));
   document.getElementById("rdNext").addEventListener("click", () => setPage(pageIndex + 1));
-  document.getElementById("rdIn").addEventListener("click", () => { zoom = M.clamp(zoom + 0.25, fitZoomValue, 3); applyZoom(); });
-  document.getElementById("rdOut").addEventListener("click", () => { zoom = M.clamp(zoom - 0.25, fitZoomValue, 3); applyZoom(); });
+  document.getElementById("rdIn").addEventListener("click", () => { zoom = M.clamp(zoom + 0.10, fitZoomValue, 3); applyZoom(); });
+  document.getElementById("rdOut").addEventListener("click", () => { zoom = M.clamp(zoom - 0.10, fitZoomValue, 3); applyZoom(); });
   btnText.addEventListener("click", () => {
     showText = !showText;
     textPane.hidden = !showText;
@@ -115,8 +115,8 @@
     if (!dlg.open) return;
     if (e.key === "ArrowRight") setPage(pageIndex + 1);
     if (e.key === "ArrowLeft") setPage(pageIndex - 1);
-    if (e.key === "+") { zoom = M.clamp(zoom + 0.25, fitZoomValue, 3); applyZoom(); }
-    if (e.key === "-") { zoom = M.clamp(zoom - 0.25, fitZoomValue, 3); applyZoom(); }
+    if (e.key === "+") { zoom = M.clamp(zoom + 0.10, fitZoomValue, 3); applyZoom(); }
+    if (e.key === "-") { zoom = M.clamp(zoom - 0.10, fitZoomValue, 3); applyZoom(); }
   });
   // drag-to-pan
   let dragging = false, sx = 0, sy = 0, sl = 0, st = 0;
@@ -134,7 +134,7 @@
   body.addEventListener("wheel", (e) => {
     if (!e.ctrlKey) return;
     e.preventDefault();
-    zoom = M.clamp(zoom + (e.deltaY < 0 ? 0.15 : -0.15), fitZoomValue, 3);
+    zoom = M.clamp(zoom + (e.deltaY < 0 ? 0.08 : -0.08), fitZoomValue, 3);
     applyZoom();
   }, { passive: false });
 
