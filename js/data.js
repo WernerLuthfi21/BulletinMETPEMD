@@ -192,22 +192,13 @@
 
   async function loadStoredImagePage(issue, slot, alt) {
     const url = await ensurePageSlotUrl(issue, slot);
-    const response = await withTimeout(fetch(url, { cache: "no-store" }), PAGE_TIMEOUT, "fetching issue page image");
-    if (!response.ok) throw new Error("Issue page image request failed (" + response.status + ")");
-    const blob = await withTimeout(response.blob(), PAGE_TIMEOUT, "reading issue page image");
-    const objectUrl = URL.createObjectURL(blob);
-    try {
-      const size = await withTimeout(new Promise((resolve, reject) => {
-        const im = new Image();
-        im.onload = () => resolve({ w: im.naturalWidth, h: im.naturalHeight });
-        im.onerror = () => reject(new Error("Issue page image failed to decode"));
-        im.src = objectUrl;
-      }), PAGE_TIMEOUT, "decoding issue page image");
-      return { src: objectUrl, hi: objectUrl, w: size.w, h: size.h, alt };
-    } catch (e) {
-      URL.revokeObjectURL(objectUrl);
-      throw e;
-    }
+    const size = await withTimeout(new Promise((resolve, reject) => {
+      const im = new Image();
+      im.onload = () => resolve({ w: im.naturalWidth, h: im.naturalHeight });
+      im.onerror = () => reject(new Error("Issue page image failed to load"));
+      im.src = url;
+    }), PAGE_TIMEOUT, "loading issue page image");
+    return { src: url, hi: url, w: size.w, h: size.h, alt };
   }
 
   async function renderPdfPage(issue, i, alt, preview, slot) {
