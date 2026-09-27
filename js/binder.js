@@ -1113,6 +1113,7 @@
 
   async function openBinder() {
     if (B.opened || flipping || navigationBusy) return;
+    hintEl.classList.remove("on");
     if (!B.single) {
       binderEl.setAttribute("data-cover-opening", "true");
       await syncLidRevealPage();
@@ -1204,6 +1205,7 @@
 
   async function closeBinder() {
     if (!B.opened || flipping || navigationBusy) return;
+    hintEl.classList.remove("on");
 
     if (!B.single) {
       binderEl.setAttribute("data-cover-opening", "true");
@@ -1366,7 +1368,10 @@
     });
 
     if (!M.reducedMotion()) {
-      setTimeout(() => { hintEl.textContent = "Drag a corner or use \u2039 \u203A to turn the page"; hintEl.classList.add("on"); }, 1300);
+      hintEl.textContent = "Drag a corner or use \u2039 \u203A to turn the page";
+      setTimeout(() => {
+        if (B.opened && !binderEl.hasAttribute("data-cover-opening")) hintEl.classList.add("on");
+      }, 1300);
       setTimeout(() => hintEl.classList.remove("on"), 5200);
     }
   };
