@@ -120,25 +120,50 @@
           <option value="1">1 page</option>
           <option value="2">2 pages</option>
         </select></label>
-        <p class="hint-sm" style="align-self:end;margin:0 0 10px">Controls whether this month appears as one page or as #1 and #2.</p>
+        <p class="hint-sm" style="align-self:end;margin:0 0 10px">Choose whether this month has page #1 only or page #1 + #2. Each page has its own upload below.</p>
       </div>
 
-      <div class="upload-zone" id="uploadZone" tabindex="0" role="button" aria-label="Upload bulletin file, PDF, PNG or JPG">
-        <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" hidden>
-        <div id="uploadIdle">
-          <strong>Drop a PDF, PNG or JPG here</strong>
-          <span>or click to browse · up to <span id="maxMbLabel">25</span> MB</span>
-        </div>
-        <div id="uploadCurrent" hidden>
-          <strong id="uploadCurrentName">current-file.pdf</strong>
-          <span>already uploaded for this issue — drop a new file to replace it</span>
-        </div>
-        <div id="uploadProgress" hidden>
-          <div class="bar"><div class="bar-fill" id="uploadBarFill"></div></div>
-          <span id="uploadStatus">Uploading…</span>
-        </div>
+      <div class="page-upload-grid" id="pageUploadGrid">
+        <section class="page-upload-slot" data-page="1">
+          <div class="page-upload-head"><strong>Page #1</strong><span>First logical page</span></div>
+          <div class="upload-zone page-upload-zone" id="uploadZone1" tabindex="0" role="button" aria-label="Upload page 1, PDF, PNG or JPG">
+            <input type="file" id="fileInput1" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" hidden>
+            <div id="uploadIdle1">
+              <strong>Drop page #1 file here</strong>
+              <span>PDF, PNG or JPG · up to <span class="maxMbLabel">25</span> MB</span>
+            </div>
+            <div id="uploadCurrent1" hidden>
+              <strong id="uploadCurrentName1">page-1</strong>
+              <span>already uploaded — drop a new file to replace page #1</span>
+            </div>
+            <div id="uploadProgress1" hidden>
+              <div class="bar"><div class="bar-fill" id="uploadBarFill1"></div></div>
+              <span id="uploadStatus1">Uploading…</span>
+            </div>
+          </div>
+          <p class="msg" id="uploadMsg1" role="status"></p>
+        </section>
+
+        <section class="page-upload-slot" data-page="2" id="pageUploadSlot2">
+          <div class="page-upload-head"><strong>Page #2</strong><span>Second logical page</span></div>
+          <div class="upload-zone page-upload-zone" id="uploadZone2" tabindex="0" role="button" aria-label="Upload page 2, PDF, PNG or JPG">
+            <input type="file" id="fileInput2" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" hidden>
+            <div id="uploadIdle2">
+              <strong>Drop page #2 file here</strong>
+              <span>PDF, PNG or JPG · up to <span class="maxMbLabel">25</span> MB</span>
+            </div>
+            <div id="uploadCurrent2" hidden>
+              <strong id="uploadCurrentName2">page-2</strong>
+              <span>already uploaded — drop a new file to replace page #2</span>
+            </div>
+            <div id="uploadProgress2" hidden>
+              <div class="bar"><div class="bar-fill" id="uploadBarFill2"></div></div>
+              <span id="uploadStatus2">Uploading…</span>
+            </div>
+          </div>
+          <p class="msg" id="uploadMsg2" role="status"></p>
+        </section>
       </div>
-      <p class="msg" id="uploadMsg" role="status"></p>
 
       <div class="hl-head">
         <span>Text version (for the reader &amp; screen readers)</span>
