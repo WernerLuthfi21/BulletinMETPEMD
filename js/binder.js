@@ -615,71 +615,20 @@
 
     const frontShade = M.el("div", { class: "physical-turn-shade" });
     const backShade = M.el("div", { class: "physical-turn-shade" });
-    const frontDepthLight = M.el("div", { class: "page-depth-light" });
-    const backDepthLight = M.el("div", { class: "page-depth-light" });
-    const frontDepthShadow = M.el("div", { class: "page-depth-shadow" });
-    const backDepthShadow = M.el("div", { class: "page-depth-shadow" });
     front.appendChild(frontShade);
-    front.appendChild(frontDepthLight);
-    front.appendChild(frontDepthShadow);
     back.appendChild(backShade);
-    back.appendChild(backDepthLight);
-    back.appendChild(backDepthShadow);
 
     host.appendChild(front);
     host.appendChild(back);
     spreadEl.appendChild(host);
     binderEl.setAttribute("data-turning", "true");
 
-    return {
-      host, front, back, frontShade, backShade,
-      frontDepthLight, backDepthLight, frontDepthShadow, backDepthShadow
-    };
+    return { host, front, back, frontShade, backShade };
   }
 
   function updateTurn(sheet, p, dir) {
     const e = .5 - .5 * Math.cos(Math.PI * p);
     updateTurnProgress(sheet, e, dir);
-  }
-
-  function updateTurnLighting(sheet, p, dir) {
-    // One light source, one progress value. peak is maximal at 90deg.
-    const peak = Math.sin(Math.PI * p);
-    const edge = 1 - peak;
-    const sweep = (p * 2 - 1) * 58;
-    const hinge = dir > 0 ? -1 : 1;
-    const lightScale = 0.72 + peak * 0.48;
-    const shadowScale = 0.82 + edge * 0.34;
-
-    sheet.host.style.setProperty("--page-light-opacity", (0.04 + peak * 0.42).toFixed(3));
-    sheet.host.style.setProperty("--page-fold-opacity", (0.05 + edge * 0.34).toFixed(3));
-    sheet.host.style.setProperty("--page-sheen-x", sweep.toFixed(2) + "%");
-
-    if (sheet.frontDepthLight) {
-      sheet.frontDepthLight.style.opacity = (0.04 + peak * 0.46).toFixed(3);
-      sheet.frontDepthLight.style.transform =
-        "translate3d(" + (sweep * 0.72).toFixed(2) + "%,0,0) scaleX(" + lightScale.toFixed(3) + ")";
-    }
-    if (sheet.backDepthLight) {
-      sheet.backDepthLight.style.opacity = (0.03 + peak * 0.34).toFixed(3);
-      sheet.backDepthLight.style.transform =
-        "translate3d(" + (sweep * -0.55).toFixed(2) + "%,0,0) scaleX(" + (0.76 + peak * 0.34).toFixed(3) + ")";
-    }
-    if (sheet.frontDepthShadow) {
-      sheet.frontDepthShadow.style.opacity = (0.03 + edge * 0.40).toFixed(3);
-      sheet.frontDepthShadow.style.transform =
-        "translate3d(" + (hinge * (4 + edge * 10)).toFixed(2) + "%,0,0) scaleX(" + shadowScale.toFixed(3) + ")";
-    }
-    if (sheet.backDepthShadow) {
-      sheet.backDepthShadow.style.opacity = (0.03 + edge * 0.32).toFixed(3);
-      sheet.backDepthShadow.style.transform =
-        "translate3d(" + (hinge * (-4 - edge * 8)).toFixed(2) + "%,0,0) scaleX(" + (0.86 + edge * 0.24).toFixed(3) + ")";
-    }
-
-    binderEl.style.setProperty("--turn-cast-opacity", (peak * 0.34).toFixed(3));
-    binderEl.style.setProperty("--turn-cast-scale", (0.90 + peak * 0.14).toFixed(3));
-    binderEl.style.setProperty("--turn-cast-x", (hinge * peak * 7).toFixed(2) + "px");
-    binderEl.style.setProperty("--turn-cast-y", (2 + peak * 5).toFixed(2) + "px");
   }
 
   function updateTurnProgress(sheet, progress, dir) {
@@ -700,7 +649,6 @@
       "rotateX(" + pitch.toFixed(3) + "deg)";
     sheet.frontShade.style.opacity = String(Math.min(.5, curl * .52));
     sheet.backShade.style.opacity = String(Math.min(.38, curl * .42));
-    updateTurnLighting(sheet, p);
   }
 
   function makeTurnUnderlay(node, left, width) {
@@ -827,10 +775,6 @@
         if (underlay) underlay.remove();
         sheet.host.remove();
         binderEl.removeAttribute("data-turning");
-        binderEl.style.setProperty("--turn-cast-opacity", "0");
-        binderEl.style.setProperty("--turn-cast-scale", "0.90");
-        binderEl.style.setProperty("--turn-cast-x", "0px");
-        binderEl.style.setProperty("--turn-cast-y", "0px");
         slotL.style.visibility = "";
         slotR.style.visibility = "";
         flipping = false;
@@ -1220,9 +1164,6 @@
       lid.style.setProperty("--lid-light-y", Math.round(12 + arc * 10) + "%");
 
       if (frontShade) frontShade.style.opacity = String(Math.min(.34, arc * .34));
-      lid.style.setProperty("--cover-light", (0.06 + Math.sin(Math.PI * eased) * 0.28).toFixed(3));
-      lid.style.setProperty("--cover-fold-shadow", (0.06 + (1 - Math.sin(Math.PI * eased)) * 0.24).toFixed(3));
-      lid.style.setProperty("--cover-sheen-x", ((eased * 2 - 1) * 52).toFixed(2) + "%");
       if (lidRevealPage) {
         const rp = M.clamp((eased - 0.48) / 0.44, 0, 1);
         const re = rp * rp * (3 - 2 * rp);
@@ -1255,9 +1196,6 @@
         }, 18);
       }
       lid.style.pointerEvents = "none";
-      lid.style.setProperty("--cover-light", "0");
-      lid.style.setProperty("--cover-fold-shadow", "0");
-      lid.style.setProperty("--cover-sheen-x", "0%");
       lid.style.transform =
         "translate3d(0,0,0) rotateY(-178deg) rotateX(0deg)";
     }
@@ -1319,9 +1257,6 @@
       lid.style.setProperty("--lid-light-y", Math.round(12 + arc * 10) + "%");
 
       if (frontShade) frontShade.style.opacity = String(Math.min(.34, arc * .34));
-      lid.style.setProperty("--cover-light", (0.06 + Math.sin(Math.PI * eased) * 0.28).toFixed(3));
-      lid.style.setProperty("--cover-fold-shadow", (0.06 + (1 - Math.sin(Math.PI * eased)) * 0.24).toFixed(3));
-      lid.style.setProperty("--cover-sheen-x", ((eased * 2 - 1) * 52).toFixed(2) + "%");
       if (lidRevealPage) {
         const rp = M.clamp((0.70 - eased) / 0.46, 0, 1);
         const re = rp * rp * (3 - 2 * rp);
@@ -1343,9 +1278,6 @@
       if (lidRevealPage) lidRevealPage.style.opacity = "0";
       lid.style.transition = "none";
       lid.style.opacity = "1";
-      lid.style.setProperty("--cover-light", "0");
-      lid.style.setProperty("--cover-fold-shadow", "0");
-      lid.style.setProperty("--cover-sheen-x", "0%");
       lid.style.transform =
         "translate3d(0,0,0) rotateY(0deg) rotateX(0deg)";
     }
