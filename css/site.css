@@ -199,23 +199,33 @@ img{max-width:100%}
 .binder[data-mode="single"] .slot.left{display:none}
 .slot.empty{visibility:hidden;box-shadow:none}
 
+.binder[data-state="open"] .spread{z-index:8}
 .spread-page-tags{
-  position:absolute;left:0;right:0;top:-30px;height:22px;z-index:12;
-  display:flex;align-items:flex-end;pointer-events:none;user-select:none;
+  position:absolute;left:0;right:0;top:-32px;height:24px;z-index:20;
+  display:flex;align-items:center;pointer-events:none;user-select:none;
 }
 .spread-page-tag{
-  box-sizing:border-box;width:50%;padding:3px 10px 4px;
-  color:var(--ink-soft);font:600 10px/1 var(--cond);letter-spacing:.05em;text-transform:uppercase;
+  box-sizing:border-box;width:50%;margin:0 4px;padding:5px 12px;
+  color:#fffaf4;background:rgba(58,34,19,.94);
+  border:1px solid rgba(255,225,190,.55);border-radius:4px;
+  font:700 10px/1 var(--cond);letter-spacing:.08em;text-transform:uppercase;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;
+  text-shadow:0 1px 1px rgba(0,0,0,.65);
+  box-shadow:0 2px 5px rgba(20,8,3,.28),inset 0 1px 0 rgba(255,255,255,.16);
 }
-.binder[data-mode="single"] .spread-page-tags{top:-27px}
+.spread-page-tag.left{margin-right:2px}
+.spread-page-tag.right{margin-left:2px}
+.binder[data-mode="single"] .spread-page-tags{top:-30px;height:24px}
 .binder[data-mode="single"] .spread-page-tag.left{display:none}
-.binder[data-mode="single"] .spread-page-tag.right{width:100%;padding:4px 8px;text-align:center}
-@media (max-width:900px){
-  .spread-page-tags{top:-26px;height:20px}
-  .spread-page-tag{font-size:9px;padding:3px 6px 4px}
+.binder[data-mode="single"] .spread-page-tag.right{
+  width:100%;margin:0 4px;padding:5px 10px;text-align:center;
 }
-
+@media (max-width:900px){
+  .binder[data-state="open"] .spread{z-index:8}
+  .spread-page-tags{top:-29px;height:23px}
+  .spread-page-tag{width:calc(50% - 4px);font-size:9px;padding:5px 7px}
+  .binder[data-mode="single"] .spread-page-tag.right{width:calc(100% - 8px)}
+}
 .leaf{
   position:absolute;inset:0;overflow:hidden;background:#faf5e8;color:var(--ink);
 }
