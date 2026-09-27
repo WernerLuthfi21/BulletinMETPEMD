@@ -615,15 +615,26 @@
 
     const frontShade = M.el("div", { class: "physical-turn-shade" });
     const backShade = M.el("div", { class: "physical-turn-shade" });
+    const frontDepthLight = M.el("div", { class: "page-depth-light" });
+    const backDepthLight = M.el("div", { class: "page-depth-light" });
+    const frontDepthShadow = M.el("div", { class: "page-depth-shadow" });
+    const backDepthShadow = M.el("div", { class: "page-depth-shadow" });
     front.appendChild(frontShade);
+    front.appendChild(frontDepthLight);
+    front.appendChild(frontDepthShadow);
     back.appendChild(backShade);
+    back.appendChild(backDepthLight);
+    back.appendChild(backDepthShadow);
 
     host.appendChild(front);
     host.appendChild(back);
     spreadEl.appendChild(host);
     binderEl.setAttribute("data-turning", "true");
 
-    return { host, front, back, frontShade, backShade };
+    return {
+      host, front, back, frontShade, backShade,
+      frontDepthLight, backDepthLight, frontDepthShadow, backDepthShadow
+    };
   }
 
   function updateTurn(sheet, p, dir) {
@@ -631,17 +642,44 @@
     updateTurnProgress(sheet, e, dir);
   }
 
-  function updateTurnLighting(sheet, p) {
-    // All cinematic lighting derives from the exact eased rotation progress.
-    // peak = 1 at 90deg, 0 at the two end positions.
+  function updateTurnLighting(sheet, p, dir) {
+    // One light source, one progress value. peak is maximal at 90deg.
     const peak = Math.sin(Math.PI * p);
     const edge = 1 - peak;
     const sweep = (p * 2 - 1) * 58;
-    sheet.host.style.setProperty("--page-light-opacity", (0.05 + peak * 0.30).toFixed(3));
-    sheet.host.style.setProperty("--page-fold-opacity", (0.06 + edge * 0.30).toFixed(3));
+    const hinge = dir > 0 ? -1 : 1;
+    const lightScale = 0.72 + peak * 0.48;
+    const shadowScale = 0.82 + edge * 0.34;
+
+    sheet.host.style.setProperty("--page-light-opacity", (0.04 + peak * 0.42).toFixed(3));
+    sheet.host.style.setProperty("--page-fold-opacity", (0.05 + edge * 0.34).toFixed(3));
     sheet.host.style.setProperty("--page-sheen-x", sweep.toFixed(2) + "%");
-    binderEl.style.setProperty("--turn-cast-opacity", (peak * 0.22).toFixed(3));
-    binderEl.style.setProperty("--turn-cast-scale", (0.92 + peak * 0.12).toFixed(3));
+
+    if (sheet.frontDepthLight) {
+      sheet.frontDepthLight.style.opacity = (0.04 + peak * 0.46).toFixed(3);
+      sheet.frontDepthLight.style.transform =
+        "translate3d(" + (sweep * 0.72).toFixed(2) + "%,0,0) scaleX(" + lightScale.toFixed(3) + ")";
+    }
+    if (sheet.backDepthLight) {
+      sheet.backDepthLight.style.opacity = (0.03 + peak * 0.34).toFixed(3);
+      sheet.backDepthLight.style.transform =
+        "translate3d(" + (sweep * -0.55).toFixed(2) + "%,0,0) scaleX(" + (0.76 + peak * 0.34).toFixed(3) + ")";
+    }
+    if (sheet.frontDepthShadow) {
+      sheet.frontDepthShadow.style.opacity = (0.03 + edge * 0.40).toFixed(3);
+      sheet.frontDepthShadow.style.transform =
+        "translate3d(" + (hinge * (4 + edge * 10)).toFixed(2) + "%,0,0) scaleX(" + shadowScale.toFixed(3) + ")";
+    }
+    if (sheet.backDepthShadow) {
+      sheet.backDepthShadow.style.opacity = (0.03 + edge * 0.32).toFixed(3);
+      sheet.backDepthShadow.style.transform =
+        "translate3d(" + (hinge * (-4 - edge * 8)).toFixed(2) + "%,0,0) scaleX(" + (0.86 + edge * 0.24).toFixed(3) + ")";
+    }
+
+    binderEl.style.setProperty("--turn-cast-opacity", (peak * 0.34).toFixed(3));
+    binderEl.style.setProperty("--turn-cast-scale", (0.90 + peak * 0.14).toFixed(3));
+    binderEl.style.setProperty("--turn-cast-x", (hinge * peak * 7).toFixed(2) + "px");
+    binderEl.style.setProperty("--turn-cast-y", (2 + peak * 5).toFixed(2) + "px");
   }
 
   function updateTurnProgress(sheet, progress, dir) {
@@ -790,7 +828,9 @@
         sheet.host.remove();
         binderEl.removeAttribute("data-turning");
         binderEl.style.setProperty("--turn-cast-opacity", "0");
-        binderEl.style.setProperty("--turn-cast-scale", "0.92");
+        binderEl.style.setProperty("--turn-cast-scale", "0.90");
+        binderEl.style.setProperty("--turn-cast-x", "0px");
+        binderEl.style.setProperty("--turn-cast-y", "0px");
         slotL.style.visibility = "";
         slotR.style.visibility = "";
         flipping = false;
