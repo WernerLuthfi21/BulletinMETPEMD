@@ -13,7 +13,15 @@
   try { previous = localStorage.getItem(key); } catch (e) {}
 
   function hardReload(version) {
-    try { localStorage.setItem(key, version); } catch (e) {}
+    var reloadKey = key + ":attempted:" + version;
+    var alreadyAttempted = false;
+    try { alreadyAttempted = sessionStorage.getItem(reloadKey) === "1"; } catch (e) {}
+    if (alreadyAttempted) return;
+    try {
+      sessionStorage.setItem(reloadKey, "1");
+      localStorage.setItem(key, version);
+    } catch (e) {}
+
     var purge = (window.caches && caches.keys)
       ? caches.keys().then(function (keys) {
           return Promise.all(keys.map(function (name) {
