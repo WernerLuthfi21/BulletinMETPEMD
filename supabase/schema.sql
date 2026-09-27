@@ -59,10 +59,10 @@ create table if not exists public.issues (
   editors text[] not null default '{}',
   contributors text[] not null default '{}',
   status text not null default 'draft' check (status in ('draft','published')),
-  file_path text,                 -- path inside the "bulletins" storage bucket
+  file_path text,                 -- legacy single-file source (kept for backwards compatibility)
   file_type text,                 -- 'pdf' | 'png' | 'jpg' | 'jpeg'
-  page_count int,                 -- number of pages in the uploaded PDF/image source
-  display_page_count int not null default 2 check (display_page_count between 1 and 2),
+  page_count int,                 -- legacy/source file page count
+  display_page_count int not null default 1 check (display_page_count between 1 and 2),
   highlights jsonb not null default '[]'::jsonb,  -- [{heading,text}, ...] text version
   published_at timestamptz,
   created_by uuid references auth.users(id),
@@ -70,20 +70,125 @@ create table if not exists public.issues (
   updated_at timestamptz not null default now(),
   unique (year, month)
 );
--- Existing projects created before display_page_count existed need this additive migration.
+
+-- Existing projects may already have the issues table without the per-page
+-- selector/asset table. This section is additive and migration-safe.
 alter table public.issues
-  add column if not exists display_page_count int not null default 2;
-do $
+  add column if not exists display_page_count int;
+
+update public.issues
+set display_page_count = least(greatest(coalesce(page_count, 1), 1), 2)
+where display_page_count is null;
+
+alter table public.issues
+  alter column display_page_count set default 1,
+  alter column display_page_count set not null;
+
+do $$
 begin
   if not exists (
-    select 1 from pg_constraint
+    select 1
+    from pg_constraint
     where conname = 'issues_display_page_count_check'
       and conrelid = 'public.issues'::regclass
   ) then
     alter table public.issues
-      add constraint issues_display_page_count_check check (display_page_count between 1 and 2);
+      add constraint issues_display_page_count_check
+      check (display_page_count between 1 and 2);
   end if;
-end $;
+end $$;
+
+-- Each logical bulletin page is its own asset. A PDF may be used as a source,
+-- with source_page identifying which source page backs the logical page.
+create table if not exists public.issue_pages (
+  id uuid primary key default gen_random_uuid(),
+  issue_id uuid not null references public.issues(id) on delete cascade,
+  page_number int not null check (page_number between 1 and 2),
+  file_path text not null,
+  file_type text not null check (lower(file_type) in ('pdf','png','jpg','jpeg')),
+  source_page int not null default 1 check (source_page >= 1),
+  source_page_count int not null default 1 check (source_page_count >= 1),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (issue_id, page_number),
+  check (source_page <= source_page_count)
+);
+
+alter table public.issue_pages enable row level security;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where policyname = 'public reads published issue pages'
+      and schemaname = 'public' and tablename = 'issue_pages'
+  ) then
+    create policy "public reads published issue pages"
+      on public.issue_pages for select
+      using (exists (
+        select 1 from public.issues i
+        where i.id = issue_pages.issue_id and i.status = 'published'
+      ));
+  end if;
+  if not exists (
+    select 1 from pg_policies
+    where policyname = 'admins read all issue pages'
+      and schemaname = 'public' and tablename = 'issue_pages'
+  ) then
+    create policy "admins read all issue pages"
+      on public.issue_pages for select
+      using (public.is_admin());
+  end if;
+  if not exists (
+    select 1 from pg_policies
+    where policyname = 'admins insert issue pages'
+      and schemaname = 'public' and tablename = 'issue_pages'
+  ) then
+    create policy "admins insert issue pages"
+      on public.issue_pages for insert
+      with check (public.is_admin());
+  end if;
+  if not exists (
+    select 1 from pg_policies
+    where policyname = 'admins update issue pages'
+      and schemaname = 'public' and tablename = 'issue_pages'
+  ) then
+    create policy "admins update issue pages"
+      on public.issue_pages for update
+      using (public.is_admin())
+      with check (public.is_admin());
+  end if;
+  if not exists (
+    select 1 from pg_policies
+    where policyname = 'admins delete issue pages'
+      and schemaname = 'public' and tablename = 'issue_pages'
+  ) then
+    create policy "admins delete issue pages"
+      on public.issue_pages for delete
+      using (public.is_admin());
+  end if;
+end $$;
+
+-- Preserve existing single-file issues. For a two-page source PDF, logical
+-- pages #1/#2 point at the corresponding source pages of the same file.
+insert into public.issue_pages (
+  issue_id, page_number, file_path, file_type, source_page, source_page_count
+)
+select
+  i.id,
+  gs.page_number,
+  i.file_path,
+  lower(i.file_type),
+  gs.page_number,
+  greatest(coalesce(i.page_count, 1), 1)
+from public.issues i
+cross join lateral generate_series(
+  1,
+  least(greatest(coalesce(i.page_count, 1), 1), 2)
+) as gs(page_number)
+where i.file_path is not null
+  and lower(coalesce(i.file_type, '')) in ('pdf','png','jpg','jpeg')
+on conflict (issue_id, page_number) do nothing;
 
 alter table public.issues enable row level security;
 
