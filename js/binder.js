@@ -589,12 +589,10 @@
     const curl = Math.sin(Math.PI * p);
     const lift = curl * 9;
     const pitch = (dir > 0 ? -1 : 1) * curl * 1.35;
-    const squeeze = 1 - curl * .018;
     sheet.host.style.transform =
       "rotateY(" + angle.toFixed(3) + "deg) " +
       "translateZ(" + lift.toFixed(2) + "px) " +
-      "rotateX(" + pitch.toFixed(3) + "deg) " +
-      "scaleX(" + squeeze.toFixed(4) + ")";
+      "rotateX(" + pitch.toFixed(3) + "deg)";
     sheet.frontShade.style.opacity = String(Math.min(.58, curl * .62));
     sheet.backShade.style.opacity = String(Math.min(.44, curl * .48));
     sheet.front.style.filter = "brightness(" + (1 - curl * .075).toFixed(3) + ")";
@@ -1000,66 +998,22 @@
   let openingFrame = 0;
   let openingLastTime = 0;
   let openingReady = false;
-  let motionClosedX = 0;
-
-  function closedBinderX() {
-    if (B.single) return 0;
-    const cs = getComputedStyle(binderEl.parentElement);
-    const lw = slotR.offsetWidth;
-    const ms = parseFloat(cs.getPropertyValue("--ms")) || 0;
-    const tabsGutter = parseFloat(cs.getPropertyValue("--tabs-gutter")) || 0;
-    return -((lw + ms) / 2) + tabsGutter / 2;
-  }
-
-  function setBinderPose(progress, closedX) {
-    const x = B.single ? 0 : closedX * (1 - progress);
-    const yaw = B.single ? 360 * progress : 0;
-    binderEl.style.transform =
-      "translate3d(" + x.toFixed(2) + "px,0,0) rotate(-.35deg) rotateY(" + yaw.toFixed(3) + "deg)";
-    tabsEl.style.transform = B.single ? "" : "translateX(" + x.toFixed(2) + "px)";
-  }
-
   function setCoverHinge() {
     lid.style.transformOrigin = B.single ? "calc(var(--ms) + 16px) center" : "left center";
   }
 
-  function setSpreadClipPose(progress) {
-    const clipped = 50 * (1 - progress);
-    spreadEl.style.clipPath = "inset(0 0 0 " + clipped.toFixed(3) + "%)";
-  }
-
-  const CLOSED_PAGE_ANGLE = 180;
   const COVER_FRONT_DEPTH = 8;
   const COVER_BACK_DEPTH = -10;
-  function setPageOpenPose(progress) {
-    const angle = CLOSED_PAGE_ANGLE * (1 - progress);
-    const lift = Math.sin(Math.PI * progress) * 4;
-    const leftLeaf = leafNode(slotL);
-    const rightLeaf = leafNode(slotR);
-    if (leftLeaf) {
-      leftLeaf.style.transform =
-        "translateZ(" + lift.toFixed(2) + "px) rotateY(" + (-angle).toFixed(3) + "deg)";
-      leftLeaf.style.filter = "brightness(" + (1 - (1 - progress) * .12).toFixed(3) + ")";
-    }
-    if (rightLeaf) {
-      rightLeaf.style.transform =
-        "translateZ(" + lift.toFixed(2) + "px) rotateY(" + angle.toFixed(3) + "deg)";
-      rightLeaf.style.filter = "brightness(" + (1 - (1 - progress) * .12).toFixed(3) + ")";
-    }
-  }
-
-  function renderOpeningPose(progress, closedX) {
-    // One eased progress drives the cover, folded page leaves, reveal, depth,
-    // desk alignment, and mobile's full assembly turn. At mobile 360 degrees
-    // the assembly returns to face the reader while its cover remains hinged open.
+  function renderOpeningPose(progress) {
     const p = .5 - .5 * Math.cos(Math.PI * M.clamp(progress, 0, 1));
     const coverAngle = -180 * p;
     const coverDepth = COVER_FRONT_DEPTH + (COVER_BACK_DEPTH - COVER_FRONT_DEPTH) * p;
     lid.style.transform =
       "translateZ(" + coverDepth.toFixed(2) + "px) rotateY(" + coverAngle.toFixed(3) + "deg)";
-    setBinderPose(p, closedX);
-    setSpreadClipPose(p);
-    setPageOpenPose(p);
+    // The desktop closed volume is one page wide; reveal the other leaf with the hinge.
+    spreadEl.style.clipPath = B.single
+      ? ""
+      : "inset(0 0 0 " + (50 * (1 - p)).toFixed(3) + "%)";
     paintPaperMotion(p);
     const shade = Math.sin(Math.PI * p);
     lidShade.style.opacity = String(Math.min(.5, shade * .58));
@@ -1068,7 +1022,6 @@
 
   function settleCover(open) {
     openProgress = open ? 1 : 0;
-    renderOpeningPose(openProgress, motionClosedX);
     B.opened = open;
     binderEl.setAttribute("data-state", open ? "open" : "closed");
     binderEl.removeAttribute("data-motion");
@@ -1078,6 +1031,7 @@
     coverMotion = false;
     openingFrame = 0;
     openingLastTime = 0;
+    renderOpeningPose(openProgress);
   }
 
   function failCoverMotion(error) {
@@ -1085,7 +1039,7 @@
     openTarget = B.opened ? 1 : 0;
     if (!B.opened) {
       openProgress = 0;
-      renderOpeningPose(0, motionClosedX);
+      renderOpeningPose(0);
       binderEl.setAttribute("data-state", "closed");
     }
     binderEl.removeAttribute("data-motion");
@@ -1108,7 +1062,7 @@
       if (openTarget > openProgress) openProgress = Math.min(openTarget, openProgress + step);
       else openProgress = Math.max(openTarget, openProgress - step);
     }
-    renderOpeningPose(openProgress, motionClosedX);
+    renderOpeningPose(openProgress);
 
     if (openProgress === openTarget) {
       settleCover(openTarget === 1);
@@ -1138,7 +1092,6 @@
 
     coverMotion = true;
     openTarget = target;
-    motionClosedX = closedBinderX();
     binderEl.setAttribute("data-motion", open ? "opening" : "closing");
     setCoverHinge();
     lid.style.pointerEvents = "auto";
@@ -1241,9 +1194,8 @@
     B.selectedIssueId = B.issues[B.issues.length - 1].id;
     renderSpread();
     renderTabs();
-    motionClosedX = closedBinderX();
     setCoverHinge();
-    renderOpeningPose(openProgress, motionClosedX);
+    renderOpeningPose(openProgress);
     // Warm the visible spread immediately. Opening is allowed to animate only
     // after this promise resolves, so the first open frame cannot be blank.
     waitForCurrentSpread();
@@ -1273,14 +1225,7 @@
         resizeT = setTimeout(syncResponsiveMode, 200);
         return;
       }
-      if (single === B.single) {
-        // Recompute the desktop cover offset when the leaf width changes within the same mode.
-        if (!single && !B.opened && binderEl.dataset.state === "closed") {
-          motionClosedX = closedBinderX();
-          renderOpeningPose(openProgress, motionClosedX);
-        }
-        return;
-      }
+      if (single === B.single) return;
       const curPage = (B.spreads[B.cur] || []).find(Boolean) || null;
       B.single = single;
       binderEl.setAttribute("data-mode", single ? "single" : "dual");
@@ -1296,9 +1241,8 @@
       }
       B.cur = newCur;
       renderSpread();
-      motionClosedX = closedBinderX();
       setCoverHinge();
-      renderOpeningPose(openProgress, motionClosedX);
+      renderOpeningPose(openProgress);
       warmSpread(B.spreads[B.cur]);
       warmSpread(B.spreads[B.cur - 1]);
       warmSpread(B.spreads[B.cur + 1]);
@@ -1348,8 +1292,7 @@
     const idx = B.issues.findIndex((i) => i.id === B.selectedIssueId);
     B.cur = idx >= 0 ? firstSpreadOfIssue(idx) : Math.max(0, B.spreads.length - 1);
     renderSpread();
-    motionClosedX = closedBinderX();
-    renderOpeningPose(openProgress, motionClosedX);
+    renderOpeningPose(openProgress);
     warmSpread(B.spreads[B.cur]);
     const warmAdjacent = () => {
       warmSpread(B.spreads[B.cur - 1]);

@@ -92,24 +92,11 @@ img{max-width:100%}
   height:calc(var(--lh) + var(--mt) + var(--mb));
   perspective:2600px;perspective-origin:50% 38%;
   transform-style:preserve-3d;-webkit-transform-style:preserve-3d;transform-origin:50% 50%;
-  transition:transform .9s var(--ease);
-  transform:translateX(0) rotate(-.35deg);
-}
-.binder::before{
-  content:"";position:absolute;inset:0;pointer-events:none;border-radius:9px;
-  transform:translateZ(-12px) rotateY(180deg);
-  backface-visibility:hidden;-webkit-backface-visibility:hidden;
-  background:
-    url(../assets/textures/cover-grain.webp) 0 0/230px auto,
-    linear-gradient(135deg,var(--red-600),var(--red-800) 70%,var(--red-950));
-  background-blend-mode:soft-light,normal;
+  transition:none;
+  transform:rotate(-.35deg);
 }
 .binder[data-motion]{transition:none!important;
 }
-/* closed: only the right half (front cover) is visible, centred */
-/* (+ half the tab gutter, so the lone cover sits centred between the desk props) */
-.binder[data-state="closed"]{transform:translateX(calc((var(--lw) + var(--ms))/-2 + var(--tabs-gutter)/2)) rotate(-.35deg)}
-.binder[data-mode="single"][data-state="closed"]{transform:rotate(-.35deg)}
 
 .b-shadow{
   position:absolute;inset:10px -8px -22px 14px;border-radius:14px;z-index:0;
@@ -140,17 +127,12 @@ img{max-width:100%}
 .binder[data-state="closed"]:not([data-motion]) .hint{opacity:0;visibility:hidden}
 .hint{opacity:0;visibility:hidden}
 .binder[data-state="closed"]:not([data-motion]) .spread{
-  opacity:1;visibility:visible;clip-path:inset(0 0 0 50%);
+  opacity:1;visibility:visible;
 }
 .binder[data-state="closed"]:not([data-motion]) + .tabs{opacity:0;visibility:hidden;pointer-events:none}
 .binder[data-motion="opening"] .spread,
 .binder[data-motion="closing"] .spread{
   opacity:1;visibility:visible;
-  /* clip-path is intentionally NOT set here: js/binder.js writes it inline,
-     every frame, from the same progress value that drives the cover. If a
-     clip-path were set here it would apply instantly the moment data-motion
-     is toggled — before the cover has rotated at all — which is exactly the
-     "page 1 already showing before the cover has moved" bug. */
 }
 /* The first spread's folded-to-flat pose is written on the same animation
    frame and progress timeline as the cover and mobile binder turn. */
@@ -167,13 +149,18 @@ img{max-width:100%}
   opacity:1;visibility:visible;
 }
 .binder[data-mode="single"] .cover.left{display:none}
-.binder[data-mode="single"] .cover.right{left:0;right:0;width:auto;border-radius:3px 9px 9px 3px}
+.binder[data-mode="single"] .cover.right{
+  display:block;left:0;right:0;width:auto;border-radius:3px 9px 9px 3px;
+  transform:translateZ(-6px);
+  background:linear-gradient(135deg,#6f111e,#8d1726 48%,#64101a);
+  box-shadow:inset 1px 1px 0 rgba(255,190,190,.24),inset -2px -2px 0 rgba(0,0,0,.28);
+}
 /* gutter (spine recess) */
 .b-crease{
   position:absolute;left:50%;top:0;bottom:0;width:46px;transform:translateX(-50%);z-index:2;pointer-events:none;
   background:linear-gradient(90deg,transparent,rgba(0,0,0,.28) 34%,rgba(0,0,0,.5) 50%,rgba(0,0,0,.28) 66%,transparent);
 }
-.binder[data-mode="single"] .b-crease{left:calc(var(--ms) + 8px);width:30px}
+.binder[data-mode="single"] .b-crease{left:calc(var(--ms) + 16px);width:30px}
 
 /* ---------- 5. spread & leaves ---------- */
 .spread{
@@ -207,7 +194,8 @@ img{max-width:100%}
   box-shadow:0 3px 5px rgba(20,8,3,.28);
 }
 .slot .leaf{
-  backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  transform-style:preserve-3d;-webkit-transform-style:preserve-3d;
+  backface-visibility:visible;-webkit-backface-visibility:visible;
 }
 .slot.left .leaf{transform-origin:right center}
 .slot.right .leaf{transform-origin:left center}

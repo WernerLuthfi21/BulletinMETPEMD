@@ -25,10 +25,9 @@
     purge.catch(function () {}).then(function () {
       // A query on the document URL also bypasses a stale GitHub Pages/CDN
       // document, while every CSS/JS asset already carries the same build id.
-      var url = window.location.pathname +
-        "?metp=" + encodeURIComponent(version) +
-        window.location.hash;
-      window.location.replace(url);
+      var url = new URL(window.location.href);
+      url.searchParams.set("metp", version);
+      window.location.replace(url.pathname + url.search + url.hash);
     });
   }
 
