@@ -42,7 +42,9 @@
   // by a stale/blank loading state during the flip. This is especially
   // important on mobile where image decode can otherwise take several frames.
   const pageCache = new Map();
+  const pageResultCache = new Map();
   const imageCache = new Map();
+  let assetRevision = 0;
 
   function pageKey(meta) {
     if (!meta || meta.placeholder) return null;
@@ -55,28 +57,51 @@
     if (meta.issue.spread) return Promise.resolve(null); // block-based page: nothing to fetch/decode
     if (pageCache.has(key)) return pageCache.get(key);
     const promise = meta.issue.getPage(meta.pageIndex, { preview: true }).then((pg) => {
-      const src = pg.src;
-      if (!imageCache.has(src)) {
-        imageCache.set(src, M.withTimeout(new Promise((resolve, reject) => {
-          const img = new Image();
-          img.decoding = "async";
-          img.onload = () => resolve(img);
-          img.onerror = () => reject(new Error("Image failed to preload: " + src));
-          img.src = src;
-          if (img.complete && img.naturalWidth > 0) {
-            Promise.resolve(img.decode ? img.decode() : null).finally(() => resolve(img));
-          }
-        }), 20000, "preloading image").catch((e) => { imageCache.delete(src); throw e; }));
-      }
-      return imageCache.get(src).then(() => pg);
+      return preloadImage(pg.src).then(() => pg);
     });
-    pageCache.set(key, promise);
-    promise.catch(() => pageCache.delete(key));
-    return promise;
+    const revision = assetRevision;
+    const cachedPromise = promise.then((pg) => {
+      if (revision === assetRevision) pageResultCache.set(key, pg);
+      return pg;
+    });
+    pageCache.set(key, cachedPromise);
+    cachedPromise.catch(() => {
+      if (pageCache.get(key) === cachedPromise) pageCache.delete(key);
+    });
+    return cachedPromise;
   }
 
   function warmSpread(spread) {
     return Promise.all((spread || []).map((pg) => preloadPage(pg)));
+  }
+
+  function preloadImage(src) {
+    if (!imageCache.has(src)) {
+      imageCache.set(src, M.withTimeout(new Promise((resolve, reject) => {
+        const img = new Image();
+        img.decoding = "async";
+        img.onload = async () => {
+          try {
+            if (img.decode) await img.decode();
+            resolve(img);
+          } catch (error) {
+            reject(error);
+          }
+        };
+        img.onerror = () => reject(new Error("Image failed to preload: " + src));
+        img.src = src;
+        if (img.complete && img.naturalWidth > 0) {
+          Promise.resolve(img.decode ? img.decode() : null).then(
+            () => resolve(img),
+            reject
+          );
+        }
+      }), 20000, "preloading image").catch((error) => {
+        imageCache.delete(src);
+        throw error;
+      }));
+    }
+    return imageCache.get(src);
   }
 
   /* ---------- building the page/spread model ---------- */
@@ -203,6 +228,20 @@
       leaf.appendChild(buildSpreadPage(meta));
       return leaf;
     }
+    const cachedPage = pageResultCache.get(pageKey(meta));
+    if (cachedPage) {
+      leaf.appendChild(M.el("img", {
+        class: "leaf-img",
+        src: cachedPage.src,
+        alt: cachedPage.alt || "",
+        loading: "eager",
+        decoding: "async"
+      }));
+      const openBtn = M.el("button", { class: "leaf-open", type: "button", "aria-label": "Open this page in the reader" });
+      bindReaderButton(openBtn, meta);
+      leaf.appendChild(openBtn);
+      return leaf;
+    }
     const status = M.el("div", { class: "leaf-status" }, [
       M.el("div", { class: "spinner", "aria-hidden": "true" }),
       M.el("span", { text: "Loading page\u2026" })
@@ -210,8 +249,16 @@
     leaf.appendChild(status);
     const openBtn = M.el("button", { class: "leaf-open", type: "button", "aria-label": "Open this page in the reader" });
     leaf.appendChild(openBtn);
+    bindReaderButton(openBtn, meta);
     loadLeafImage(leaf, status, openBtn, meta);
     return leaf;
+  }
+
+  function bindReaderButton(button, meta) {
+    if (button.dataset.bound) return;
+    button.dataset.bound = "1";
+    button.addEventListener("click", () => window.METP.reader.open(meta.issue, meta.pageIndex));
+    button.setAttribute("aria-label", "Open " + meta.issue.label + ", page " + (meta.pageIndex + 1) + " in the reader");
   }
 
   /* ---------- data-driven spread pages: month -> left/right -> blocks ----------
@@ -260,7 +307,7 @@
         return M.el("hr", { class: "blk-divider" });
       case "image": {
         if (!b.src) return null;
-        const img = M.el("img", { src: b.src, alt: b.alt || "", loading: "lazy" });
+        const img = M.el("img", { src: b.src, alt: b.alt || "", loading: "eager", decoding: "async" });
         if (b.objectPosition) img.style.objectPosition = b.objectPosition;
         const kids = [img];
         if (b.caption) kids.push(M.el("figcaption", { text: b.caption }));
@@ -281,11 +328,16 @@
 
   function loadLeafImage(leaf, status, openBtn, meta) {
     preloadPage(meta).then((pg) => {
+      // A physical flip can hydrate this same leaf synchronously after the
+      // preload resolves. Never append a second image when that happens.
+      if (leaf.querySelector(".leaf-img")) {
+        if (status && status.isConnected) status.remove();
+        return;
+      }
       const img = M.el("img", { class: "leaf-img", src: pg.src, alt: pg.alt, loading: "eager", decoding: "async" });
       leaf.insertBefore(img, status);
       status.remove();
-      openBtn.addEventListener("click", () => window.METP.reader.open(meta.issue, meta.pageIndex));
-      openBtn.setAttribute("aria-label", "Open " + meta.issue.label + ", page " + (meta.pageIndex + 1) + " in the reader");
+      bindReaderButton(openBtn, meta);
     }).catch((err) => {
       console.error("[METP] page load failed", err);
       status.textContent = "";
@@ -298,6 +350,39 @@
         loadLeafImage(leaf, status, openBtn, meta);
       });
     });
+  }
+
+  async function hydrateLeafImage(leaf, meta) {
+    if (!leaf || !meta || meta.placeholder || (meta.issue && meta.issue.spread)) return leaf;
+    const pg = await preloadPage(meta);
+    if (!pg) return leaf;
+
+    // The visible leaf may still contain the loading marker even though the
+    // image has already been preloaded. Replace that marker NOW, before a
+    // physical turn starts, so the photograph is literally part of the sheet
+    // from frame 0 instead of appearing underneath it mid-flip.
+    if (!leaf.querySelector(".leaf-img")) {
+      const status = leaf.querySelector(".leaf-status");
+      const openBtn = leaf.querySelector(".leaf-open");
+      const img = M.el("img", {
+        class: "leaf-img",
+        src: pg.src,
+        alt: pg.alt || "",
+        loading: "eager",
+        decoding: "async"
+      });
+      img.src = pg.src;
+      if (img.decode) await img.decode();
+      leaf.insertBefore(img, status || null);
+      if (status) status.remove();
+      if (openBtn) bindReaderButton(openBtn, meta);
+    }
+    return leaf;
+  }
+
+  async function buildReadyLeafContent(meta, side) {
+    const leaf = buildLeafContent(meta, side);
+    return hydrateLeafImage(leaf, meta);
   }
 
   function buildPlaceholder(meta) {
@@ -320,22 +405,44 @@
     return wrap;
   }
 
-  function renderSpread() {
+  // The part of a re-render that MUST happen the instant a flip reaches its
+  // midpoint: swap what the two slots contain, so the still-rotating leaf's
+  // back face lines up with real content the moment it faces forward.
+  // Deliberately minimal — no tab rebuilding, no credits card, nothing that
+  // isn't required for that one visual guarantee — because this runs
+  // synchronously inside the same requestAnimationFrame tick as the flip's
+  // own transform update. Any extra work here delays that frame's paint
+  // and shows up as a stutter at the exact moment the turn is most visible.
+  function renderSpreadCore() {
     const [a, b] = B.spreads[B.cur] || [null, null];
-    slotL.classList.toggle("empty", !a);
-    slotR.classList.toggle("empty", !b && !B.single);
     slotL.textContent = "";
     slotR.textContent = "";
-    if (a) slotL.appendChild(buildLeafContent(pageMeta(a), "left"));
-    if (b) slotR.appendChild(buildLeafContent(pageMeta(b), "right"));
-    else if (!B.single) slotR.appendChild(buildLeafContent(null, "right"));
-
-    renderMeta();
+    // "empty" must reflect what actually got appended below, not the raw
+    // a/b pair — a null right page in dual mode still gets a real blank
+    // "leaf-back-paper" sheet appended (so the spread never shows a gap),
+    // so the slot must NOT be marked empty (which is visibility:hidden and
+    // would hide that very sheet again, leaving the desk showing through).
+    let leftFilled = false, rightFilled = false;
+    if (a) { slotL.appendChild(buildLeafContent(pageMeta(a), "left")); leftFilled = true; }
+    if (b) { slotR.appendChild(buildLeafContent(pageMeta(b), "right")); rightFilled = true; }
+    else if (!B.single) { slotR.appendChild(buildLeafContent(null, "right")); rightFilled = true; }
+    slotL.classList.toggle("empty", !leftFilled);
+    slotR.classList.toggle("empty", !rightFilled);
+    updatePageStackDepths();
     document.getElementById("prevPage").disabled = B.cur === 0;
     document.getElementById("nextPage").disabled = B.cur === B.spreads.length - 1;
     const peelL = document.getElementById("peelLeft"), peelR = document.getElementById("peelRight");
     if (peelL) peelL.disabled = B.cur === 0;
     if (peelR) peelR.disabled = B.cur === B.spreads.length - 1;
+  }
+
+  // Full re-render: the core swap above, plus the header/credits card and
+  // the month-tab strip. Used whenever there is no in-flight flip animation
+  // to protect (init, resize, a background data refresh) — safe to do all
+  // of this in one go since nothing here needs to race a paint.
+  function renderSpread() {
+    renderSpreadCore();
+    renderMeta();
     renderTabs();
   }
 
@@ -382,203 +489,563 @@
     return n;
   }
 
-  /* ---------- page-flip animation (true 3D flip, not a swap) ---------- */
+  /* ---------- physical page-stack thickness ----------
+     The visible edge is not a fixed decorative shadow. It represents the
+     number of sheets actually remaining behind each side of the spread.
+     As the reader advances, sheets migrate from the right stack to the left
+     stack exactly like a real binder. */
+  function updatePageStackDepths() {
+    const total = B.pages.filter((p) => p && !p.placeholder).length;
+    const before = flatIndexOfSpread(B.cur);
+    const visible = (B.spreads[B.cur] || []).filter((p) => p && !p.placeholder).length;
+    const after = Math.max(0, total - before - visible);
+
+    // Keep the visual thickness subtle; one sheet is about 0.7px of visible
+    // edge and the whole stack is capped so a large bulletin stays believable.
+    const leftDepth = Math.min(15, before) * 0.72;
+    const rightDepth = Math.min(15, after) * 0.72;
+    slotL.style.setProperty("--stack-depth", leftDepth.toFixed(2) + "px");
+    slotR.style.setProperty("--stack-depth", rightDepth.toFixed(2) + "px");
+    slotL.style.setProperty("--stack-pages", String(Math.min(15, before)));
+    slotR.style.setProperty("--stack-pages", String(Math.min(15, after)));
+  }
+
+  /* ---------- page-flip animation: one physical sheet ---------- */
   let flipping = false;
   let navigationBusy = false;
-  // How long a page-turn will wait for the destination image to finish
-  // decoding before it turns anyway. Keeping this short is what makes the
-  // flip feel instant/seamless even when a page hasn't been warmed yet —
-  // the destination leaf has its own spinner and swaps the image in the
-  // moment it's ready, so nothing is ever blocked on a slow network or a
-  // slow PDF render.
-  const WARM_BUDGET = 450;
+
+  // A spread is a real book spread: LEFT stays fixed while the RIGHT sheet
+  // turns forward. The back of that sheet is the destination LEFT page.
+  // Going backward is the exact mirror: LEFT turns to the RIGHT and its back
+  // is the destination RIGHT page. This is the key invariant that prevents
+  // the old "two cards spinning at once" artifact.
+  const FLIP_DESKTOP_MS = 780;
+  const FLIP_SINGLE_MS = 620;
+  const OPEN_MS = 960;
+
+  function flipDuration() {
+    return B.single ? FLIP_SINGLE_MS : FLIP_DESKTOP_MS;
+  }
+
+  function leafNode(slot) {
+    return slot && slot.firstElementChild ? slot.firstElementChild : null;
+  }
+
+  async function ensureSpreadReady(spread) {
+    const pages = (spread || []).filter(Boolean);
+    // A turn/open is allowed to start only when every destination asset that
+    // can be preloaded has actually resolved. This prevents a white/loading
+    // leaf from appearing exactly when the cover or page reaches its most
+    // visible angle.
+    try {
+      const media = [];
+      pages.forEach((page) => {
+        if (!page.issue || !page.issue.spread) return;
+        [page.issue.spread.left, page.issue.spread.right].forEach((side) => {
+          (side && Array.isArray(side.blocks) ? side.blocks : []).forEach((block) => {
+            if (block && block.type === "image" && block.src) media.push(preloadImage(block.src));
+          });
+        });
+      });
+      await Promise.all(pages.map((p) => preloadPage(p)).concat(media));
+      return true;
+    } catch (e) {
+      console.warn("[METP] spread warm-up incomplete; rendering retry state", e);
+      return false;
+    }
+
+  }
+
+  function makeTurnSheet(sourceNode, backNode, dir) {
+    const host = M.el("div", { class: "physical-turn" });
+    host.setAttribute("aria-hidden", "true");
+    const rect = spreadEl.getBoundingClientRect();
+    const half = B.single ? rect.width : rect.width / 2;
+    const isForward = dir > 0;
+    host.style.width = (B.single ? rect.width : half) + "px";
+    host.style.left = (B.single ? 0 : (isForward ? half : 0)) + "px";
+    host.style.transformOrigin = isForward ? "left center" : "right center";
+
+    const front = M.el("div", { class: "physical-turn-face front" });
+    const back = M.el("div", { class: "physical-turn-face back" });
+    if (sourceNode) front.appendChild(sourceNode);
+    back.appendChild(backNode || buildLeafContent(null, isForward ? "left" : "right"));
+
+    const frontShade = M.el("div", { class: "physical-turn-shade" });
+    const backShade = M.el("div", { class: "physical-turn-shade" });
+    front.appendChild(frontShade);
+    back.appendChild(backShade);
+
+    host.appendChild(front);
+    host.appendChild(back);
+    spreadEl.appendChild(host);
+
+    return { host, front, back, frontShade, backShade };
+  }
+
+  function updateTurn(sheet, p, dir) {
+    const e = .5 - .5 * Math.cos(Math.PI * p);
+    updateTurnProgress(sheet, e, dir);
+  }
+
+  function updateTurnProgress(sheet, progress, dir) {
+    const p = M.clamp(progress, 0, 1);
+    const angle = (dir > 0 ? -180 : 180) * p;
+    const curl = Math.sin(Math.PI * p);
+    const lift = curl * (B.single ? 0.9 : 3.0);
+    const pitch = (dir > 0 ? -1 : 1) * curl * (B.single ? 0 : 0.55);
+    sheet.host.style.transform =
+      "rotateY(" + angle.toFixed(3) + "deg) " +
+      "translateZ(" + lift.toFixed(2) + "px) " +
+      "rotateX(" + pitch.toFixed(3) + "deg)";
+    sheet.frontShade.style.opacity = String(Math.min(.5, curl * .52));
+    sheet.backShade.style.opacity = String(Math.min(.38, curl * .42));
+  }
+
+  function makeTurnUnderlay(node, left, width) {
+    const under = M.el("div", { class: "physical-turn-underlay" });
+    under.style.left = left + "px";
+    under.style.width = width + "px";
+    if (node) under.appendChild(node);
+    spreadEl.appendChild(under);
+    return under;
+  }
+
+  async function animatePhysicalTurn(dir, target, viaTab) {
+    const destination = B.spreads[target] || [];
+    const rect = spreadEl.getBoundingClientRect();
+    const half = B.single ? rect.width : rect.width / 2;
+
+    if (B.single) {
+      const source = leafNode(slotR);
+      if (!source) return Promise.resolve();
+      const currentSpread = B.spreads[B.cur] || [null, null];
+      await hydrateLeafImage(source, pageMeta(currentSpread[1]));
+      const destPage = destination.find(Boolean) || null;
+      const back = destPage
+        ? await buildReadyLeafContent(pageMeta(destPage), "right")
+        : await buildReadyLeafContent(null, "right");
+      // Mobile is a single physical sheet. The destination belongs on the
+      // sheet's back face; do not create a second visible underlay/page.
+      const sheet = makeTurnSheet(source, back, dir);
+      slotR.style.visibility = "hidden";
+      return runPhysicalTurn(sheet, dir, () => {
+        B.cur = target;
+        if (!viaTab) {
+          const first = destination.find((p) => p && !p.placeholder);
+          if (first) B.selectedIssueId = first.issue.id;
+        }
+        renderSpreadCore();
+      }, null);
+    }
+
+    if (dir > 0) {
+      // Forward: the current RIGHT page is the only physical sheet that
+      // moves. The destination RIGHT page is placed underneath it BEFORE
+      // the source is hidden, so the right side is never an empty red slab.
+      const source = leafNode(slotR);
+      if (!source) return Promise.resolve();
+
+      const currentSpread = B.spreads[B.cur] || [null, null];
+      await hydrateLeafImage(source, pageMeta(currentSpread[1]));
+      const destinationLeft = destination[0] || null;
+      const destinationRight = destination[1] || null;
+      const back = destinationLeft
+        ? await buildReadyLeafContent(pageMeta(destinationLeft), "left")
+        : await buildReadyLeafContent(null, "left");
+      const under = makeTurnUnderlay(
+        destinationRight
+          ? await buildReadyLeafContent(pageMeta(destinationRight), "right")
+          : await buildReadyLeafContent(null, "right"),
+        half, half
+      );
+      const sheet = makeTurnSheet(source, back, dir);
+      slotR.style.visibility = "hidden";
+
+      return runPhysicalTurn(sheet, dir, () => {
+        B.cur = target;
+        if (!viaTab) {
+          const first = destination.find((p) => p && !p.placeholder);
+          if (first) B.selectedIssueId = first.issue.id;
+        }
+        renderSpreadCore();
+      }, under);
+    }
+
+    // Backward: mirror image. The destination LEFT page is already underneath
+    // the sheet before the current LEFT page is hidden.
+    const source = leafNode(slotL);
+    if (!source) return Promise.resolve();
+
+    const currentSpread = B.spreads[B.cur] || [null, null];
+    await hydrateLeafImage(source, pageMeta(currentSpread[0]));
+    const destinationLeft = destination[0] || null;
+    const destinationRight = destination[1] || null;
+    const back = destinationRight
+      ? await buildReadyLeafContent(pageMeta(destinationRight), "right")
+      : await buildReadyLeafContent(null, "right");
+    const under = makeTurnUnderlay(
+      destinationLeft
+        ? await buildReadyLeafContent(pageMeta(destinationLeft), "left")
+        : await buildReadyLeafContent(null, "left"),
+      0, half
+    );
+    const sheet = makeTurnSheet(source, back, dir);
+    slotL.style.visibility = "hidden";
+
+    return runPhysicalTurn(sheet, dir, () => {
+      B.cur = target;
+      if (!viaTab) {
+        const first = destination.find((p) => p && !p.placeholder);
+        if (first) B.selectedIssueId = first.issue.id;
+      }
+      renderSpreadCore();
+    }, under);
+  }
+
+  function runPhysicalTurn(sheet, dir, onLand, underlay) {
+    if (M.reducedMotion()) {
+      onLand();
+      if (underlay) underlay.remove();
+      sheet.host.remove();
+      slotL.style.visibility = "";
+      slotR.style.visibility = "";
+      return Promise.resolve();
+    }
+
+    flipping = true;
+    M.sound && M.sound.flip();
+
+    const duration = flipDuration();
+    let start = null;
+    return new Promise((resolve) => {
+      let finished = false;
+      let watchdog;
+
+      function finish() {
+        if (finished) return;
+        finished = true;
+        clearTimeout(watchdog);
+        try { onLand(); } catch (e) { console.error("[METP] turn landing failed", e); }
+        if (underlay) underlay.remove();
+        sheet.host.remove();
+        slotL.style.visibility = "";
+        slotR.style.visibility = "";
+        flipping = false;
+        resolve();
+      }
+
+      function frame(ts) {
+        if (finished) return;
+        if (start == null) start = ts;
+        const p = M.clamp((ts - start) / duration, 0, 1);
+        updateTurn(sheet, p, dir);
+        if (p < 1) requestAnimationFrame(frame);
+        else finish();
+      }
+
+      watchdog = setTimeout(finish, duration + 1000);
+      requestAnimationFrame(frame);
+    });
+  }
+
   async function goToSpread(target, viaTab) {
     target = M.clamp(target, 0, B.spreads.length - 1);
-    if (target === B.cur || flipping || navigationBusy || !B.spreads.length) return;
+    if (target === B.cur || flipping || navigationBusy || !B.spreads.length || !B.opened) return;
+
     const dir = target > B.cur ? 1 : -1;
     navigationBusy = true;
     try {
-      // Give the destination a brief head start to decode, but never let a
-      // slow or failed fetch hold the whole interface hostage — a caught
-      // failure here just means the flip proceeds and the leaf shows its
-      // own loading/retry state once the flip lands.
-      await Promise.race([warmSpread(B.spreads[target]).catch(() => {}), M.delay(WARM_BUDGET)]);
-      if (target === B.cur || flipping) return;
-      await animateFlip(dir, target, () => {
-        B.cur = target;
-        if (!viaTab) {
-          const first = (B.spreads[target] || []).find((p) => p && !p.placeholder);
-          if (first) B.selectedIssueId = first.issue.id;
-        }
-        renderSpread();
-      }, viaTab);
+      // Warm the exact destination before creating the moving leaf. This is
+      // intentionally a hard prerequisite for animation: a spinner must
+      // never become the face of a moving page.
+      const ready = await ensureSpreadReady(B.spreads[target]);
+      if (!ready) return;
+      if (target === B.cur || flipping || !B.opened) return;
+      await animatePhysicalTurn(dir, target, viaTab);
+      currentSpreadReady = false;
+      currentSpreadReady = await ensureSpreadReady(B.spreads[B.cur]);
+      renderMeta();
+      renderTabs();
     } catch (err) {
-      // Should be unreachable now (animateFlip never rejects), but guarantee
-      // the interface is never left stuck if something unexpected throws.
       console.error("[METP] page turn failed", err);
-      flipping = false;
       renderSpread();
     } finally {
       navigationBusy = false;
     }
   }
 
-  // Builds one flipping leaf (a temporary front/back card hinged at its own
-  // spine edge) and returns an updater driven by the shared rAF loop below.
-  // `hinge` is fixed by which physical half this leaf occupies — 'left'
-  // means the spine is at its right edge (visually "hinge: right center"),
-  // 'right' means the spine is at its left edge. The rotation SIGN (which
-  // way it swings) is what encodes forward vs backward, via `dir`.
-  function buildLeafFlipper(spreadEl2, hinge, leftPx, w, frontPg, backPg, dir) {
-    const flipper = M.el("div", { class: "flipper" });
-    flipper.style.width = w + "px";
-    flipper.style.left = leftPx + "px";
-    flipper.style.transformOrigin = hinge === "right" ? "left center" : "right center";
+  /* ---------- real pull-to-turn interaction ----------
+     The reference implementation uses a sheet whose transform origin is its
+     bound edge. Here the same sheet is driven continuously by pointer
+     distance: drag a bottom corner, watch the page follow the finger, then
+     release to either complete the turn or spring back. */
+  async function bindPeel(el, forward) {
+    if (!el) return;
+    let active = false;
+    let moved = false;
+    let pending = false;
+    let startX = 0;
+    let lastX = 0;
+    let pointerId = null;
+    let sheet = null;
+    let underlay = null;
+    let progress = 0;
+    let dragWidth = 1;
+    let startY = 0;
+    let lastMoveTime = 0;
+    let dragVelocity = 0;
+    let gestureAxis = 0; // 1 = horizontal, -1 = vertical/cancelled
+    let clickSuppressed = false;
 
-    const side = hinge === "right" ? "right" : "left";
-    const front = M.el("div", { class: "face front" }, [buildLeafContent(pageMeta(frontPg), side)]);
-    const back = M.el("div", { class: "face back" }, [buildLeafContent(pageMeta(backPg), side)]);
-    front.appendChild(M.el("div", { class: "shade" }));
-    front.appendChild(M.el("div", { class: "sheen" }));
-    back.appendChild(M.el("div", { class: "shade" }));
-    back.appendChild(M.el("div", { class: "sheen" }));
-    flipper.appendChild(front);
-    flipper.appendChild(back);
-
-    // Self-shadow, darkest at the hinge (spine) edge, fading outward —
-    // reuses the existing .cast.l / .cast.r gradients (already authored
-    // for exactly this "dark near spine, fading away" look).
-    const cast = M.el("div", { class: hinge === "right" ? "cast r" : "cast l" });
-    cast.style.cssText = "left:" + leftPx + "px;width:" + w + "px";
-
-    spreadEl2.appendChild(cast);
-    spreadEl2.appendChild(flipper);
-
-    const frontShade = front.querySelector(".shade");
-    const backShade = back.querySelector(".shade");
-    const frontSheen = front.querySelector(".sheen");
-    const backSheen = back.querySelector(".sheen");
-
-    function update(eased) {
-      // Both leaves use the SAME signed angle: each rotates in its own
-      // local frame (transform-origin pinned at its own spine edge), and
-      // since those two origins sit on opposite sides of the spread, the
-      // same CSS sign already produces the correct mirrored motion for
-      // each side — no extra per-leaf sign flip needed.
-      const angle = -180 * dir * eased;
-      flipper.style.transform = "rotateY(" + angle + "deg)";
-      const mid = Math.sin(eased * Math.PI); // 0→1→0, peaks mid-flip
-      frontShade.style.opacity = eased < 0.5 ? M.clamp(eased * 2, 0, 1) : 0;
-      backShade.style.opacity = eased > 0.5 ? 1 - (eased - 0.5) * 2 : 0;
-      frontSheen.style.opacity = mid * 0.5;
-      backSheen.style.opacity = mid * 0.5;
-      cast.style.opacity = mid * 0.6;
+    function cleanup(cancelOnly) {
+      if (underlay) underlay.remove();
+      if (sheet) sheet.host.remove();
+      slotL.style.visibility = "";
+      slotR.style.visibility = "";
+      if (cancelOnly) renderSpreadCore();
+      sheet = null;
+      underlay = null;
+      flipping = false;
+      navigationBusy = false;
+      active = false;
+      pending = false;
     }
-    function destroy() { flipper.remove(); cast.remove(); }
-    return { update, destroy };
-  }
 
-  function animateFlip(dir, target, onMid, isJump) {
-    if (M.reducedMotion()) { onMid(); return Promise.resolve(); }
-    flipping = true;
-    M.sound && M.sound.flip();
-    const spreadEl2 = binderEl.querySelector(".spread");
-    const fullW = spreadEl2.offsetWidth;
+    async function beginSheet() {
+      const target = B.cur + (forward ? 1 : -1);
+      if (!B.opened || target < 0 || target >= B.spreads.length || flipping || navigationBusy ) return false;
 
-    const curSpread = B.spreads[B.cur];
-    const targetSpread = B.spreads[target] || [];
+      navigationBusy = true;
+      let ready;
+      try {
+        ready = await ensureSpreadReady(B.spreads[target]);
+      } catch (error) {
+        navigationBusy = false;
+        throw error;
+      }
+      if (!ready) {
+        renderSpreadCore();
+        navigationBusy = false;
+        return false;
+      }
+      if (!active) { navigationBusy = false; return false; }
 
-    // Every navigation replaces BOTH visible pages (spreads are built from
-    // sequential, non-overlapping page pairs — there is no page shared
-    // between one spread and the next), so both leaves must flip in sync.
-    // Flipping only one side while the other snapped to its new content
-    // instantly was the source of the flicker/ghosting seen before.
-    const leaves = [];
-    const hiddenSlots = [];
-    if (B.single) {
-      leaves.push(buildLeafFlipper(
-        spreadEl2, "right", 0, fullW,
-        curSpread.find(Boolean) || null, targetSpread.find(Boolean) || null, dir
-      ));
-      hiddenSlots.push(slotR);
-    } else {
-      const w = fullW / 2;
-      leaves.push(buildLeafFlipper(spreadEl2, "left", 0, w, curSpread[0], targetSpread[0], dir));
-      leaves.push(buildLeafFlipper(spreadEl2, "right", w, w, curSpread[1], targetSpread[1], dir));
-      hiddenSlots.push(slotL, slotR);
+      const destination = B.spreads[target] || [];
+      const rect = spreadEl.getBoundingClientRect();
+      const half = B.single ? rect.width : rect.width / 2;
+      dragWidth = Math.max(1, half);
+
+      if (B.single) {
+        const source = leafNode(slotR);
+        if (!source) { navigationBusy = false; return false; }
+        const dest = destination.find(Boolean) || null;
+        const currentSpread = B.spreads[B.cur] || [null, null];
+        await hydrateLeafImage(source, pageMeta(currentSpread[1]));
+        if (!active) { navigationBusy = false; return false; }
+        // Mobile has one physical sheet, so the destination is prepared
+        // once and placed directly on that sheet's back face.
+        const back = dest
+          ? await buildReadyLeafContent(pageMeta(dest), "right")
+          : await buildReadyLeafContent(null, "right");
+        if (!active) { navigationBusy = false; return false; }
+        sheet = makeTurnSheet(source, back, forward ? 1 : -1);
+        slotR.style.visibility = "hidden";
+      } else if (forward) {
+        const source = leafNode(slotR);
+        if (!source) { navigationBusy = false; return false; }
+        const currentSpread = B.spreads[B.cur] || [null, null];
+        await hydrateLeafImage(source, pageMeta(currentSpread[1]));
+        if (!active) { navigationBusy = false; return false; }
+        const back = destination[0]
+          ? await buildReadyLeafContent(pageMeta(destination[0]), "left")
+          : await buildReadyLeafContent(null, "left");
+        const underlayNode = destination[1]
+          ? await buildReadyLeafContent(pageMeta(destination[1]), "right")
+          : await buildReadyLeafContent(null, "right");
+        if (!active) { navigationBusy = false; return false; }
+        underlay = makeTurnUnderlay(underlayNode, half, half);
+        if (!active) { underlay.remove(); navigationBusy = false; return false; }
+        sheet = makeTurnSheet(source, back, 1);
+        slotR.style.visibility = "hidden";
+      } else {
+        const source = leafNode(slotL);
+        if (!source) { navigationBusy = false; return false; }
+        const currentSpread = B.spreads[B.cur] || [null, null];
+        await hydrateLeafImage(source, pageMeta(currentSpread[0]));
+        if (!active) { navigationBusy = false; return false; }
+        const back = destination[1]
+          ? await buildReadyLeafContent(pageMeta(destination[1]), "right")
+          : await buildReadyLeafContent(null, "right");
+        const underlayNode = destination[0]
+          ? await buildReadyLeafContent(pageMeta(destination[0]), "left")
+          : await buildReadyLeafContent(null, "left");
+        if (!active) { navigationBusy = false; return false; }
+        underlay = makeTurnUnderlay(underlayNode, 0, half);
+        if (!active) { underlay.remove(); navigationBusy = false; return false; }
+        sheet = makeTurnSheet(source, back, -1);
+        slotL.style.visibility = "hidden";
+      }
+
+      flipping = true;
+      pending = false;
+      M.sound && M.sound.flip();
+      progress = 0;
+      updateTurnProgress(sheet, 0, forward ? 1 : -1);
+      return true;
     }
-    hiddenSlots.forEach((s) => { s.style.visibility = "hidden"; });
 
-    const dur = isJump ? 620 : 680;
-    let start;
-    return new Promise((resolve) => {
-      let done = false, swapped = false, watchdog;
-      function swap() {
-        if (swapped) return;
-        swapped = true;
-        try { onMid(); } catch (e) { console.error("[METP] flip onMid failed", e); }
+    function animateRelease(targetProgress, dir, commit, after) {
+      const from = progress;
+      const duration = M.reducedMotion()
+        ? 0
+        : Math.max(140, Math.round(260 + Math.abs(targetProgress - from) * 360));
+
+      function finishRelease() {
+        if (commit) {
+          B.cur += forward ? 1 : -1;
+          const destination = B.spreads[B.cur] || [];
+          const first = destination.find((p) => p && !p.placeholder);
+          if (first) B.selectedIssueId = first.issue.id;
+          renderSpreadCore();
+        }
+        cleanup(!commit);
+        renderMeta();
+        renderTabs();
+        if (after) after();
       }
-      function cleanup() {
-        leaves.forEach((L) => L.destroy());
-        slotL.style.visibility = ""; slotR.style.visibility = "";
+
+      if (!duration) {
+        progress = targetProgress;
+        updateTurnProgress(sheet, progress, dir);
+        finishRelease();
+        return;
       }
-      function finish() {
-        if (done) return;
-        done = true;
-        clearTimeout(watchdog);
-        swap(); // guarantee the model/DOM landed even if a frame was skipped
-        cleanup();
-        flipping = false;
-        resolve();
-      }
+
+      let start = null;
       function frame(ts) {
-        if (done) return;
-        try {
-          if (start == null) start = ts;
-          const t = M.clamp((ts - start) / dur, 0, 1);
-          const eased = 1 - Math.pow(1 - t, 3);
-          leaves.forEach((L) => L.update(eased));
-          if (eased > 0.5) swap();
-          if (t < 1) requestAnimationFrame(frame);
-          else finish();
-        } catch (e) {
-          // A single bad frame must never leave the flip stuck mid-turn
-          // and the whole binder unresponsive — land it instantly.
-          console.error("[METP] flip frame failed", e);
-          finish();
+        if (start == null) start = ts;
+        const q = M.clamp((ts - start) / duration, 0, 1);
+        const e = q < .5 ? 4*q*q*q : 1 - Math.pow(-2*q+2,3)/2;
+        progress = from + (targetProgress - from) * e;
+        updateTurnProgress(sheet, progress, dir);
+        if (q < 1) requestAnimationFrame(frame);
+        else finishRelease();
+      }
+      requestAnimationFrame(frame);
+    }
+
+    el.addEventListener("pointerdown", async (e) => {
+      if (e.button !== 0 && e.pointerType === "mouse") return;
+      if (!B.opened || flipping || navigationBusy ) return;
+      active = true;
+      moved = false;
+      pending = true;
+      clickSuppressed = false;
+      startX = lastX = e.clientX;
+      startY = e.clientY;
+      lastMoveTime = performance.now();
+      dragVelocity = 0;
+      gestureAxis = 0;
+      pointerId = e.pointerId;
+      try { el.setPointerCapture(pointerId); } catch (err) {}
+
+      try {
+        const ok = await beginSheet();
+        if (!ok || !active) {
+          active = false;
+          return;
+        }
+        progress = 0;
+        updateTurnProgress(sheet, 0, forward ? 1 : -1);
+      } catch (error) {
+        console.error("[METP] drag turn preparation failed", error);
+        cleanup(true);
+      }
+    });
+
+    function dampedProgress(raw) {
+      const p = Math.max(0, raw);
+      if (p <= .72) return p;
+      const tail = M.clamp((p - .72) / .28, 0, 1);
+      return .72 + .28 * (1 - Math.pow(1 - tail, 1.65));
+    }
+
+    el.addEventListener("pointermove", (e) => {
+      if (!active || e.pointerId !== pointerId || !sheet) return;
+
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      if (!gestureAxis && Math.hypot(dx, dy) > 8) {
+        gestureAxis = Math.abs(dx) >= Math.abs(dy) * 1.15 ? 1 : -1;
+        if (gestureAxis < 0) {
+          moved = true;
+          clickSuppressed = true;
+          active = false;
+          animateRelease(0, forward ? 1 : -1, false);
+          return;
         }
       }
-      // Absolute safety valve: if rAF ever stops being called for this flip
-      // (e.g. the tab was backgrounded at just the wrong moment), force the
-      // turn to complete instead of leaving the interface locked forever.
-      watchdog = setTimeout(finish, dur + 1500);
-      requestAnimationFrame(frame);
-    });
-  }
+      if (gestureAxis < 0) return;
 
-  /* ---------- drag / swipe / tap on the corner peel ----------
-     forward=true (bottom-right corner): dragging it toward the spine
-     (leftward) turns the page forward, like lifting a real page.
-     forward=false (bottom-left corner): dragging rightward turns back. */
-  function bindPeel(el, forward) {
-    if (!el) return;
-    let active = false, startX = 0, moved = false;
-    const THRESH = 40;
-    el.addEventListener("pointerdown", (e) => {
-      active = true; moved = false; startX = e.clientX;
-      try { el.setPointerCapture(e.pointerId); } catch (err) {}
+      lastX = e.clientX;
+      const raw = forward
+        ? (startX - lastX) / dragWidth
+        : (lastX - startX) / dragWidth;
+      const nextProgress = M.clamp(dampedProgress(raw), 0, 1);
+      const now = performance.now();
+      const dt = Math.max(8, now - lastMoveTime);
+      const dp = nextProgress - progress;
+      dragVelocity = dragVelocity * .78 + (dp / (dt / 1000)) * .22;
+      progress = nextProgress;
+      lastMoveTime = now;
+
+      if (Math.hypot(dx, dy) > 6) { moved = true; clickSuppressed = true; }
+      updateTurnProgress(sheet, progress, forward ? 1 : -1);
     });
-    el.addEventListener("pointermove", (e) => {
+
+    function end(e) {
+      if (!active || (e && e.pointerId !== pointerId)) return;
+      active = false;
+
+      if (!sheet) {
+        navigationBusy = false;
+        pending = false;
+        pointerId = null;
+        return;
+      }
+
+      // A tap should use the normal navigation path exactly once. Do not
+      // animate a zero-distance sheet and then dispatch a second click path.
+      if (!moved) {
+        clickSuppressed = true;
+        const target = B.cur + (forward ? 1 : -1);
+        cleanup(true);
+        try { el.releasePointerCapture(pointerId); } catch (err) {}
+        pointerId = null;
+        goToSpread(target);
+        return;
+      }
+
+      const commit = progress > .35 || (progress > .12 && dragVelocity > .32);
+      animateRelease(commit ? 1 : 0, forward ? 1 : -1, commit);
+      try { el.releasePointerCapture(pointerId); } catch (err) {}
+      pointerId = null;
+    }
+
+    el.addEventListener("pointerup", end);
+    el.addEventListener("pointercancel", (e) => {
       if (!active) return;
-      const raw = e.clientX - startX;
-      if (Math.abs(raw) > 6) moved = true;
-      const triggered = forward ? raw < -THRESH : raw > THRESH;
-      if (triggered) { active = false; goToSpread(B.cur + (forward ? 1 : -1)); }
+      active = false;
+      clickSuppressed = true;
+      if (sheet) animateRelease(0, forward ? 1 : -1, false);
+      else { navigationBusy = false; pending = false; pointerId = null; }
+      try { if (pointerId != null) el.releasePointerCapture(pointerId); } catch (err) {}
     });
-    function release() { active = false; }
-    el.addEventListener("pointerup", release);
-    el.addEventListener("pointercancel", release);
-    el.addEventListener("click", () => { if (!moved) goToSpread(B.cur + (forward ? 1 : -1)); });
+    el.addEventListener("click", () => {
+      if (!clickSuppressed) goToSpread(B.cur + (forward ? 1 : -1));
+      clickSuppressed = false;
+    });
   }
 
   /* ---------- opening / closing animation ---------- */
