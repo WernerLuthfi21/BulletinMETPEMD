@@ -489,12 +489,14 @@
     pageCountEl.textContent = total ? "Page " + M.clamp(currentPageNumber, 1, total) + " / " + total : "Page 0 / 0";
 
     if (curPage) {
-      const pageSuffix = curPage.issue.displayPageCount > 1 ? " #" + (curPage.pageIndex + 1) : "";
-      issueTitleEl.textContent = curPage.issue.label + pageSuffix + (curPage.issue.title ? " \u2014 " + curPage.issue.title : "");
+      // The lower title strip and the desk credit card represent the whole
+      // monthly issue, never the individual physical page. Page #1/#2 belongs
+      // only to the small labels above the corresponding sheets.
+      issueTitleEl.textContent = curPage.issue.label + (curPage.issue.title ? " — " + curPage.issue.title : "");
       // Block-based pages (data-driven spread content) have no page image to
       // zoom into, so "Read" (the reader's zoom view) doesn't apply to them.
       btnRead.hidden = !!curPage.issue.spread;
-      cardTitle.textContent = curPage.issue.label + pageSuffix + (curPage.issue.title ? " \u2014 \u201C" + curPage.issue.title + "\u201D" : "");
+      cardTitle.textContent = curPage.issue.label + (curPage.issue.title ? " — “" + curPage.issue.title + "”" : "");
       renderCredits(curPage.issue);
     } else {
       issueTitleEl.textContent = "Next issue \u2014 " + (a || b).label;
@@ -1079,8 +1081,32 @@
   /* ---------- opening / closing animation ---------- */
   const lid = document.getElementById("lid");
   const stickerEl = document.querySelector(".sticker");
+
+  // Desktop only: the inside of the front cover carries a temporary copy of
+  // the issue's first sheet during the opening/closing swing. It gives the lid
+  // a paper-and-binding relationship instead of exposing a mirrored cover.
+  function syncLidBackPage() {
+    if (B.single) return;
+    const face = lid.querySelector(".lid-face.back");
+    if (!face) return;
+    const old = face.querySelector(".lid-back-page");
+    if (old) old.remove();
+
+    const spread = B.spreads[B.cur] || [];
+    const current = currentPageOf(spread);
+    const first = current
+      ? B.pages.find((p) => p && !p.placeholder && p.issue && p.issue.id === current.issue.id && p.pageIndex === 0)
+      : spread.find((p) => p && !p.placeholder);
+    if (!first) return;
+
+    const page = buildReadyLeafContent(pageMeta(first), "right");
+    page.classList.add("lid-back-page");
+    face.insertBefore(page, face.firstChild);
+  }
+
   function openBinder() {
     if (B.opened || flipping || navigationBusy) return;
+    if (!B.single) syncLidBackPage();
     B.opened = true;
     binderEl.setAttribute("data-state", "open");
     lid.setAttribute("tabindex", "-1");
@@ -1121,6 +1147,7 @@
   }
   function closeBinder() {
     if (!B.opened || flipping || navigationBusy) return;
+    if (!B.single) syncLidBackPage();
     B.opened = false;
     lid.setAttribute("tabindex", "0");
     lid.style.pointerEvents = "";
@@ -1185,12 +1212,15 @@
     // Warm every available page in the background. The current and adjacent
     // spreads are prioritized so first interaction is already seamless.
     warmSpread(B.spreads[B.cur]);
+    // Delay adjacent-asset prefetch until the cover animation has settled,
+    // then warm the neighbours in sequence so PDF rasterisation does not
+    // compete with the first interaction.
     const warmAdjacent = () => {
-      warmSpread(B.spreads[B.cur - 1]);
-      warmSpread(B.spreads[B.cur + 1]);
+      const before = B.cur;
+      warmSpread(B.spreads[before - 1]);
+      setTimeout(() => warmSpread(B.spreads[B.cur + 1]), 300);
     };
-    if (window.requestIdleCallback) requestIdleCallback(warmAdjacent, { timeout: 700 });
-    else setTimeout(warmAdjacent, 60);
+    setTimeout(warmAdjacent, 1350);
 
     document.getElementById("prevPage").addEventListener("click", () => goToSpread(B.cur - 1));
     document.getElementById("nextPage").addEventListener("click", () => goToSpread(B.cur + 1));
