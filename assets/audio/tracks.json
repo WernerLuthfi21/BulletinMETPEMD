@@ -1,5 +1,20 @@
 [
   {
+    "id": "Fantasia Asmara",
+    "label": "Fantasia Asmara",
+    "src": "assets/audio/Fantasia Asmara.mp3"
+  },
+  {
+    "id": "Mechanical Room Tone",
+    "label": "Mechanical Room Tone",
+    "src": "assets/audio/Mechanical Room Tone.mp3"
+  },
+  {
+    "id": "Read",
+    "label": "Read",
+    "src": "assets/audio/Read.mp3"
+  },
+  {
     "id": "ambient-room-tone",
     "label": "Ambient Room Tone",
     "src": "assets/audio/ambient-room-tone.m4a"
@@ -18,5 +33,10 @@
     "id": "kicau-mania-ndarboy-genk-x-banditoz",
     "label": "Kicau Mania Ndarboy Genk x Banditoz",
     "src": "assets/audio/kicau-mania-ndarboy-genk-x-banditoz.mp3"
+  },
+  {
+    "id": "その先へ (1)",
+    "label": "その先へ (1)",
+    "src": "assets/audio/その先へ (1).mp3"
   }
 ]
