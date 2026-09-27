@@ -393,6 +393,10 @@ img{max-width:100%}
   .physical-turn{transition:none!important}
 }
  
+@media (max-width:900px){
+  .physical-turn{z-index:40}
+}
+
 /* ---------- 7. rings, sticker, control bar, index tabs ---------- */
 .rings{position:absolute;z-index:6;left:50%;top:var(--mt);height:var(--lh);width:0;pointer-events:none;transition:opacity .4s}
 .binder[data-mode="single"] .rings{left:calc(var(--ms) + 16px)}
