@@ -13,16 +13,18 @@
   const textPane = document.getElementById("readerText");
   const btnText = document.getElementById("rdText");
 
-  let issue = null, pageIndex = 0, zoom = 1, fitZoomValue = 1, baseWidth = 0, showText = false;
+  let issue = null, pageIndex = 0, zoom = 1, fitZoomValue = 1, baseWidth = 0, baseHeight = 0, showText = false;
   let pageRequestId = 0;
 
   function measureFitZoom() {
-    if (!baseWidth) return 1;
-    const available = Math.max(240, body.clientWidth - 28);
-    // Open desktop pages slightly below native 1:1 so the full bulletin
-    // sits comfortably inside the reader instead of feeling overly zoomed.
-    // Phones remain constrained by the available viewport width.
-    return M.clamp(Math.min(0.68, available / baseWidth), 0.35, 0.68);
+    if (!baseWidth || !baseHeight) return 1;
+    // True "Fit to Display": use both viewport dimensions so the entire
+    // bulletin page is visible at once. No arbitrary desktop zoom cap.
+    const availableWidth = Math.max(240, body.clientWidth - 28);
+    const availableHeight = Math.max(240, body.clientHeight - 28);
+    const fitByWidth = availableWidth / baseWidth;
+    const fitByHeight = availableHeight / baseHeight;
+    return M.clamp(Math.min(fitByWidth, fitByHeight), 0.25, 1);
   }
 
   function resetViewport() {
@@ -43,6 +45,7 @@
       img.src = pg.hi || pg.src;
       img.alt = pg.alt || "";
       baseWidth = pg.w;
+      baseHeight = pg.h;
       fitZoomValue = measureFitZoom();
       zoom = fitZoomValue;
       applyZoom();
@@ -90,7 +93,7 @@
   }
 
   function open(iss, p) {
-    issue = iss; pageRequestId++; zoom = 1; fitZoomValue = 1; baseWidth = 0; showText = false; textPane.hidden = true; btnText.setAttribute("aria-pressed", "false");
+    issue = iss; pageRequestId++; zoom = 1; fitZoomValue = 1; baseWidth = 0; baseHeight = 0; showText = false; textPane.hidden = true; btnText.setAttribute("aria-pressed", "false");
     title.textContent = iss.label + (iss.title ? " \u2014 " + iss.title : "");
     if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
     setPage(p || 0);
