@@ -792,6 +792,7 @@
     let sheet = null;
     let underlay = null;
     let progress = 0;
+    let dragWidth = 1;
     let clickSuppressed = false;
 
     function cleanup(cancelOnly) {
@@ -830,6 +831,7 @@
       const destination = B.spreads[target] || [];
       const rect = spreadEl.getBoundingClientRect();
       const half = B.single ? rect.width : rect.width / 2;
+      dragWidth = Math.max(1, half);
 
       if (B.single) {
         const source = leafNode(slotR);
@@ -837,15 +839,19 @@
         const dest = destination.find(Boolean) || null;
         const currentSpread = B.spreads[B.cur] || [null, null];
         await hydrateLeafImage(source, pageMeta(currentSpread[1]));
+        // Single preparation for the destination page: the underlay behind
+        // the turning sheet needs the same content as the sheet's own back
+        // face, but as a separate DOM node (it can't share the node the
+        // sheet is about to own). Build+hydrate once and clone the result
+        // instead of running buildReadyLeafContent's async preload/decode
+        // pipeline twice for the same page. The underlay is pointer-events:
+        // none, so the clone not carrying the (inert-until-clicked) reader
+        // button's live listener has no visible effect.
         const back = dest
           ? await buildReadyLeafContent(pageMeta(dest), "right")
           : await buildReadyLeafContent(null, "right");
-        underlay = makeTurnUnderlay(
-          dest
-            ? await buildReadyLeafContent(pageMeta(dest), "right")
-            : await buildReadyLeafContent(null, "right"),
-          0, rect.width
-        );
+        underlay = makeTurnUnderlay(back.cloneNode(true), 0, rect.width);
+        if (!active) { underlay.remove(); navigationBusy = false; return false; }
         sheet = makeTurnSheet(source, back, forward ? 1 : -1);
         slotR.style.visibility = "hidden";
       } else if (forward) {
@@ -862,6 +868,7 @@
             : await buildReadyLeafContent(null, "right"),
           half, half
         );
+        if (!active) { underlay.remove(); navigationBusy = false; return false; }
         sheet = makeTurnSheet(source, back, 1);
         slotR.style.visibility = "hidden";
       } else {
@@ -878,6 +885,7 @@
             : await buildReadyLeafContent(null, "left"),
           0, half
         );
+        if (!active) { underlay.remove(); navigationBusy = false; return false; }
         sheet = makeTurnSheet(source, back, -1);
         slotL.style.visibility = "hidden";
       }
@@ -892,7 +900,31 @@
 
     function animateRelease(targetProgress, dir, commit, after) {
       const from = progress;
-      const duration = Math.max(140, Math.round(260 + Math.abs(targetProgress - from) * 360));
+      const duration = M.reducedMotion()
+        ? 0
+        : Math.max(140, Math.round(260 + Math.abs(targetProgress - from) * 360));
+
+      function finishRelease() {
+        if (commit) {
+          B.cur += forward ? 1 : -1;
+          const destination = B.spreads[B.cur] || [];
+          const first = destination.find((p) => p && !p.placeholder);
+          if (first) B.selectedIssueId = first.issue.id;
+          renderSpreadCore();
+        }
+        cleanup(!commit);
+        renderMeta();
+        renderTabs();
+        if (after) after();
+      }
+
+      if (!duration) {
+        progress = targetProgress;
+        updateTurnProgress(sheet, progress, dir);
+        finishRelease();
+        return;
+      }
+
       let start = null;
       function frame(ts) {
         if (start == null) start = ts;
@@ -901,19 +933,7 @@
         progress = from + (targetProgress - from) * e;
         updateTurnProgress(sheet, progress, dir);
         if (q < 1) requestAnimationFrame(frame);
-        else {
-          if (commit) {
-            B.cur += forward ? 1 : -1;
-            const destination = B.spreads[B.cur] || [];
-            const first = destination.find((p) => p && !p.placeholder);
-            if (first) B.selectedIssueId = first.issue.id;
-            renderSpreadCore();
-          }
-          cleanup(!commit);
-          renderMeta();
-          renderTabs();
-          if (after) after();
-        }
+        else finishRelease();
       }
       requestAnimationFrame(frame);
     }
@@ -946,9 +966,9 @@
     el.addEventListener("pointermove", (e) => {
       if (!active || e.pointerId !== pointerId || !sheet) return;
       lastX = e.clientX;
-      const rect = spreadEl.getBoundingClientRect();
-      const width = B.single ? rect.width : rect.width / 2;
-      const raw = forward ? (startX - lastX) / width : (lastX - startX) / width;
+      const raw = forward
+        ? (startX - lastX) / dragWidth
+        : (lastX - startX) / dragWidth;
       progress = M.clamp(raw, 0, 1);
       if (Math.abs(lastX - startX) > 6) { moved = true; clickSuppressed = true; }
       updateTurnProgress(sheet, progress, forward ? 1 : -1);
