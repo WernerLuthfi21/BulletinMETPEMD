@@ -141,6 +141,8 @@ img{max-width:100%}
   touch-action:pan-y;user-select:none;-webkit-user-select:none;
 }
 .binder[data-mode="single"] .spread{width:var(--lw);left:calc(var(--ms) + 16px)}
+.binder[data-turning="true"] .spread{z-index:40}
+
 .binder[data-mode="single"]{width:calc(var(--lw) + var(--ms)*2 + 16px)}
 
 .slot{
