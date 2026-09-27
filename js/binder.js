@@ -1111,7 +1111,14 @@
 
     page.classList.add("lid-bound-sheet-leaf");
     page.querySelectorAll(".leaf-open").forEach((el) => el.remove());
-    sheet.appendChild(page);
+
+    // Put the paper artwork on the REAR face of the independent sheet host.
+    // Host: 0deg -> -178deg with the cover. Face: +180deg. Net orientation
+    // therefore goes 180deg -> ~2deg, so the paper starts hidden under the
+    // cover and becomes front-facing as the cover swings open.
+    const face = M.el("div", { class: "lid-sheet-face" });
+    face.appendChild(page);
+    sheet.appendChild(face);
     sheet.style.opacity = "0";
     sheet.style.visibility = "visible";
     sheet.style.transform = "translate3d(0,0,0) rotateY(0deg) rotateX(0deg)";
