@@ -115,6 +115,13 @@
         <label>Editors <span class="hint-sm">comma-separated</span><input type="text" id="fEditors" maxlength="200"></label>
       </div>
       <label>Contributors <span class="hint-sm">comma-separated</span><input type="text" id="fContributors" maxlength="300"></label>
+      <div class="grid2">
+        <label>Displayed pages<select id="fDisplayPageCount">
+          <option value="1">1 page</option>
+          <option value="2">2 pages</option>
+        </select></label>
+        <p class="hint-sm" style="align-self:end;margin:0 0 10px">Controls whether this month appears as one page or as #1 and #2.</p>
+      </div>
 
       <div class="upload-zone" id="uploadZone" tabindex="0" role="button" aria-label="Upload bulletin file, PDF, PNG or JPG">
         <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" hidden>
