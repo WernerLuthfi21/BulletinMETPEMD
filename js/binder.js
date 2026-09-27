@@ -225,12 +225,6 @@
   function buildLeafContent(meta, side) {
     const leaf = M.el("div", { class: "leaf", dataset: { side } });
     if (!meta) { leaf.classList.add("leaf-back-paper"); return leaf; }
-    if (!meta.placeholder && meta.issue && meta.issue.displayPageCount > 1) {
-      leaf.appendChild(M.el("div", {
-        class: "leaf-page-mark",
-        text: meta.issue.label + " #" + (meta.pageIndex + 1)
-      }));
-    }
     if (meta.placeholder) {
       leaf.classList.add("leaf-plain");
       leaf.appendChild(buildPlaceholder(meta));
@@ -436,8 +430,24 @@
   // synchronously inside the same requestAnimationFrame tick as the flip's
   // own transform update. Any extra work here delays that frame's paint
   // and shows up as a stutter at the exact moment the turn is most visible.
+  function renderSpreadPageTags(a, b) {
+    const old = spreadEl.querySelector(".spread-page-tags");
+    if (old) old.remove();
+    const tags = M.el("div", { class: "spread-page-tags", "aria-hidden": "true" });
+    [a, b].forEach((pg, index) => {
+      if (!pg || pg.placeholder || !pg.issue || pg.issue.displayPageCount <= 1) return;
+      const side = index === 0 ? "left" : "right";
+      tags.appendChild(M.el("span", {
+        class: "spread-page-tag " + side,
+        text: pg.issue.label + " #" + (pg.pageIndex + 1)
+      }));
+    });
+    if (tags.childElementCount) spreadEl.insertBefore(tags, spreadEl.firstChild);
+  }
+
   function renderSpreadCore() {
     const [a, b] = B.spreads[B.cur] || [null, null];
+    renderSpreadPageTags(a, b);
     slotL.textContent = "";
     slotR.textContent = "";
     // "empty" must reflect what actually got appended below, not the raw
@@ -1210,6 +1220,16 @@
     const currentSpread = B.spreads[B.cur] || [];
     const currentPage = currentSpread.find((p) => p && !p.placeholder) || null;
     const wantedKey = currentPage ? currentPage.issue.key : (B.issues.find((i) => i.id === B.selectedIssueId)?.key || null);
+    assetRevision++;
+    pageCache.clear();
+    pageResultCache.clear();
+    imageCache.forEach((_, key) => {
+      if (typeof key === "string" && key.indexOf("blob:") === 0) {
+        try { URL.revokeObjectURL(key); } catch (e) {}
+      }
+    });
+    imageCache.clear();
+    B.selectedPageKey = null;
     B.issues = issues;
     const preserved = wantedKey && B.issues.find((i) => i.key === wantedKey);
     const chosen = preserved || B.issues[B.issues.length - 1];
