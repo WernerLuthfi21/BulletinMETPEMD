@@ -82,6 +82,7 @@ img{max-width:100%}
 .binder-zone{
   --lw:414px;--lh:calc(var(--lw)*1.5459);--ms:30px;--mt:66px;--mb:62px;--tabs-gutter:88px;
   position:relative;z-index:2;flex:none;padding-right:var(--tabs-gutter);
+  perspective:2200px;perspective-origin:50% 42%;transform-style:preserve-3d;-webkit-transform-style:preserve-3d;
 }
 
 /* ---------- 4. binder body ---------- */
@@ -90,8 +91,18 @@ img{max-width:100%}
   width:calc(var(--lw)*2 + var(--ms)*2);
   height:calc(var(--lh) + var(--mt) + var(--mb));
   perspective:2600px;perspective-origin:50% 38%;
+  transform-style:preserve-3d;-webkit-transform-style:preserve-3d;transform-origin:50% 50%;
   transition:transform .9s var(--ease);
   transform:translateX(0) rotate(-.35deg);
+}
+.binder::before{
+  content:"";position:absolute;inset:0;pointer-events:none;border-radius:9px;
+  transform:translateZ(-12px) rotateY(180deg);
+  backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  background:
+    url(../assets/textures/cover-grain.webp) 0 0/230px auto,
+    linear-gradient(135deg,var(--red-600),var(--red-800) 70%,var(--red-950));
+  background-blend-mode:soft-light,normal;
 }
 .binder[data-motion]{transition:none!important;
 }
@@ -107,7 +118,7 @@ img{max-width:100%}
 .binder[data-state="closed"] .b-shadow{clip-path:inset(0 0 0 50%)}
 
 .cover{
-  position:absolute;top:0;bottom:0;width:50%;z-index:1;border-radius:9px;
+  position:absolute;top:0;bottom:0;width:50%;z-index:auto;border-radius:9px;
   background:
     url(../assets/textures/cover-grain.webp) 0 0/230px auto,
     linear-gradient(135deg,var(--red-500) 0%,var(--red-600) 30%,var(--red-800) 78%,var(--red-900) 100%);
@@ -141,12 +152,8 @@ img{max-width:100%}
      is toggled — before the cover has rotated at all — which is exactly the
      "page 1 already showing before the cover has moved" bug. */
 }
-/* The first spread's own tilt during opening/closing is now written every
-   animation frame by js/binder.js (setPageOpenPose), driven by the exact
-   same progress value as the cover's rotation (see setCoverPose/animateCover).
-   That keeps the page physically coupled to the cover instead of playing an
-   independently-timed CSS keyframe alongside it. Only the hinge geometry and
-   rendering hints live here. */
+/* The first spread's folded-to-flat pose is written on the same animation
+   frame and progress timeline as the cover and mobile binder turn. */
 .binder[data-motion="opening"] .slot .leaf,
 .binder[data-motion="closing"] .slot .leaf{
   will-change:transform;
@@ -170,9 +177,10 @@ img{max-width:100%}
 
 /* ---------- 5. spread & leaves ---------- */
 .spread{
-  position:absolute;z-index:3;left:var(--ms);top:var(--mt);
+  position:absolute;z-index:auto;left:var(--ms);top:var(--mt);
   width:calc(var(--lw)*2);height:var(--lh);
   perspective:1500px;perspective-origin:50% 42%;
+  transform-style:preserve-3d;-webkit-transform-style:preserve-3d;
   touch-action:pan-y;user-select:none;-webkit-user-select:none;
 }
 .binder[data-mode="single"] .spread{width:var(--lw);left:calc(var(--ms) + 16px)}
@@ -181,6 +189,7 @@ img{max-width:100%}
 .slot{
   position:absolute;top:0;width:var(--lw);height:var(--lh);
   --stack-depth:0px;--stack-pages:0;
+  transform-style:preserve-3d;-webkit-transform-style:preserve-3d;
   box-shadow:0 8px 9px rgba(20,8,3,.32);
 }
 .slot::before{
@@ -552,7 +561,7 @@ button.key svg,a.key svg{width:17px;height:17px;flex:none}
 
 /* outside front cover (closed state + opening animation) */
 .lid{
-  position:absolute;z-index:14;right:0;top:0;bottom:0;width:50%;
+  position:absolute;z-index:auto;right:0;top:0;bottom:0;width:50%;
   transform-origin:0 50%;
   transform-style:preserve-3d;-webkit-transform-style:preserve-3d;
   backface-visibility:visible;-webkit-backface-visibility:visible;
@@ -1035,7 +1044,7 @@ dialog::backdrop{background:rgba(18,8,3,.78);backdrop-filter:blur(2px)}
 /* One physical cover leaf, with distinct front and reverse faces. */
 .binder .lid{
   display:block!important;
-  z-index:30;
+  z-index:auto;
   transform-origin:0 50%;
   transform-style:preserve-3d;
   -webkit-transform-style:preserve-3d;
@@ -1055,11 +1064,11 @@ dialog::backdrop{background:rgba(18,8,3,.78);backdrop-filter:blur(2px)}
 .binder[data-motion="closing"] .lid{
   opacity:1!important;
   visibility:visible!important;
-  pointer-events:none!important;
+  pointer-events:auto!important;
 }
 .binder[data-state="open"]:not([data-motion]) .lid{
-  opacity:0!important;
-  visibility:hidden!important;
+  opacity:1!important;
+  visibility:visible!important;
   pointer-events:none!important;
 }
 .binder[data-state="closed"]:not([data-motion]) .lid{
