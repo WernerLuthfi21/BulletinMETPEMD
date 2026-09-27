@@ -172,7 +172,7 @@
     $("#issueDialogTitle").textContent = row ? "Edit issue" : "New issue";
     $("#issueDelete").hidden = !row;
     $("#issueFormMsg").textContent = "";
-    $("#uploadMsg").textContent = "";
+
     const now = new Date();
     $("#fMonth").value = row ? row.month : now.getMonth() + 1;
     $("#fYear").value = row ? row.year : now.getFullYear();
@@ -182,7 +182,7 @@
     $("#fContributors").value = row ? (row.contributors || []).join(", ") : "";
     $("#fDisplayPageCount").value = String(row && row.display_page_count ? row.display_page_count : 1);
     $("#fPublished").checked = row ? row.status === "published" : false;
-    $("#maxMbLabel").textContent = cfg.maxUploadMB || 25;
+    $(".maxMbLabel").forEach((n) => (n.textContent = cfg.maxUploadMB || 50));
     renderHighlights(row && row.highlights ? row.highlights : []);
     renderPageUploadZones(row);
     syncPageUploadVisibility();
@@ -192,13 +192,6 @@
   $("#issueCancel").addEventListener("click", closeIssueDialog);
   $("#issueDialogClose").addEventListener("click", closeIssueDialog);
   $("#issueDialog").addEventListener("click", (e) => { if (e.target === $("#issueDialog")) closeIssueDialog(); });
-
-  function updateUploadZone(row) {
-    $("#uploadProgress").hidden = true;
-    $("#uploadCurrent").hidden = !(row && row.file_path);
-    $("#uploadIdle").hidden = !!(row && row.file_path);
-    if (row && row.file_path) $("#uploadCurrentName").textContent = row.file_path.split("/").pop();
-  }
 
   /* ---- highlights (text-version sections) repeatable list ---- */
   function renderHighlights(list) {
