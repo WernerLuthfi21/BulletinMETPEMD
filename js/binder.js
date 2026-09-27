@@ -754,7 +754,7 @@
 
   async function goToSpread(target, viaTab) {
     target = M.clamp(target, 0, B.spreads.length - 1);
-    if (target === B.cur || flipping || navigationBusy || !B.spreads.length || !B.opened) return;
+    if (target === B.cur || flipping || navigationBusy || coverMotion || !B.spreads.length || !B.opened) return;
 
     const dir = target > B.cur ? 1 : -1;
     navigationBusy = true;
@@ -812,7 +812,7 @@
 
     async function beginSheet() {
       const target = B.cur + (forward ? 1 : -1);
-      if (!B.opened || target < 0 || target >= B.spreads.length || flipping || navigationBusy) return false;
+      if (!B.opened || target < 0 || target >= B.spreads.length || flipping || navigationBusy || coverMotion) return false;
 
       navigationBusy = true;
       let ready;
@@ -922,7 +922,7 @@
 
     el.addEventListener("pointerdown", async (e) => {
       if (e.button !== 0 && e.pointerType === "mouse") return;
-      if (!B.opened || flipping || navigationBusy) return;
+      if (!B.opened || flipping || navigationBusy || coverMotion) return;
       active = true;
       moved = false;
       pending = true;
