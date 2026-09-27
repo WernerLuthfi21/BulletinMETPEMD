@@ -599,7 +599,9 @@
 
   function updateTurnProgress(sheet, progress, dir) {
     const p = M.clamp(progress, 0, 1);
-    const angle = (dir > 0 ? -180 : 180) * p;
+    // Mobile always folds the visible sheet leftward over the left hinge.
+    // Desktop keeps the mirrored left/right physical turn.
+    const angle = (B.single ? -180 : (dir > 0 ? -180 : 180)) * p;
     const curl = Math.sin(Math.PI * p);
     const lift = curl * (B.single ? 0.9 : 3.0);
     const pitch = (dir > 0 ? -1 : 1) * curl * (B.single ? 0 : 0.55);
