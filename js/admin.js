@@ -286,7 +286,7 @@
       els.msg.textContent = "";
       els.msg.className = "msg";
     });
-    $(".maxMbLabel").forEach((n) => (n.textContent = cfg.maxUploadMB || 50));
+    $$(".maxMbLabel").forEach((n) => (n.textContent = cfg.maxUploadMB || 50));
   }
 
   function syncPageUploadVisibility() {
