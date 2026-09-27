@@ -1082,16 +1082,15 @@
   const lid = document.getElementById("lid");
   const stickerEl = document.querySelector(".sticker");
 
-  // Desktop only: build a temporary first-page sheet on a separate plane.
-  // It shares the cover hinge and transform, but it does NOT live inside
-  // the lid element, so hiding the lid at the end cannot hide the sheet.
-  function syncLidBackPage() {
-    if (B.single) return;
-    const face = lid.querySelector(".lid-face.back");
-    if (!face) return;
+  // Desktop only: ONE Page #1 plane follows the exact same
+  // hinge/rotation as the outer cover. It replaces the mirrored back face;
+  // there is deliberately only one reveal plane, so no ghost/after-image
+  // stack can remain behind the cover.
+  const lidRevealPage = document.getElementById("lidRevealPage");
 
-    const old = face.querySelector(".lid-back-page");
-    if (old) old.remove();
+  function syncLidRevealPage() {
+    if (B.single || !lidRevealPage) return;
+    lidRevealPage.textContent = "";
 
     const spread = B.spreads[B.cur] || [];
     const current = currentPageOf(spread);
@@ -1100,23 +1099,16 @@
       : spread.find((p) => p && !p.placeholder);
     if (!first) return;
 
-    let sourceLeaf = null;
-    if (spread[0] && samePage(spread[0], first)) sourceLeaf = slotL.firstElementChild;
-    if (!sourceLeaf && spread[1] && samePage(spread[1], first)) sourceLeaf = slotR.firstElementChild;
-
-    const page = sourceLeaf
-      ? sourceLeaf.cloneNode(true)
-      : buildLeafContent(pageMeta(first), "right");
-
-    page.classList.add("lid-back-page");
+    const page = buildReadyLeafContent(pageMeta(first), "right");
     page.querySelectorAll(".leaf-open").forEach((el) => el.remove());
     page.setAttribute("aria-hidden", "true");
-    face.insertBefore(page, face.firstChild);
+    page.classList.add("lid-reveal-inner");
+    lidRevealPage.appendChild(page);
   }
 
   function openBinder() {
     if (B.opened || flipping || navigationBusy) return;
-    if (!B.single) syncLidBackPage();
+    if (!B.single) syncLidRevealPage();
 
     B.opened = true;
     binderEl.setAttribute("data-state", "open");
@@ -1131,6 +1123,7 @@
 
     lid.style.opacity = "1";
     lid.style.pointerEvents = "auto";
+    if (lidRevealPage) lidRevealPage.style.opacity = "0";
     lid.style.transformOrigin = "left center";
     lid.style.transition = "none";
 
@@ -1157,6 +1150,16 @@
       lid.style.setProperty("--lid-light-y", Math.round(12 + arc * 10) + "%");
 
       if (frontShade) frontShade.style.opacity = String(Math.min(.34, arc * .34));
+      if (lidRevealPage) {
+        const rp = M.clamp((0.70 - eased) / 0.46, 0, 1);
+        const re = rp * rp * (3 - 2 * rp);
+        lidRevealPage.style.opacity = String(re);
+      }
+      if (lidRevealPage) {
+        const rp = M.clamp((eased - 0.48) / 0.44, 0, 1);
+        const re = rp * rp * (3 - 2 * rp);
+        lidRevealPage.style.opacity = String(re);
+      }
       if (shadow) {
         shadow.style.opacity = String(.55 - arc * .12);
         shadow.style.transform =
@@ -1171,7 +1174,8 @@
       // The rear page is now aligned with the real page beneath it. Fade only
       // the lid away so the physical page visibly settles into the binder
       // instead of exposing a mirrored cover for the final frame.
-      lid.style.transition = "opacity 140ms ease";
+      lid.style.transition = "opacity 110ms ease";
+      if (lidRevealPage) lidRevealPage.style.opacity = "1";
       lid.style.opacity = "0";
       lid.style.pointerEvents = "none";
       lid.style.transform =
@@ -1184,7 +1188,7 @@
   function closeBinder() {
     if (!B.opened || flipping || navigationBusy) return;
 
-    if (!B.single) syncLidBackPage();
+    if (!B.single) syncLidRevealPage();
 
     B.opened = false;
     lid.setAttribute("tabindex", "0");
@@ -1199,6 +1203,7 @@
     }
 
     lid.style.opacity = "1";
+    if (lidRevealPage) lidRevealPage.style.opacity = "1";
     lid.style.transformOrigin = "left center";
     lid.style.transition = "none";
 
@@ -1237,6 +1242,7 @@
       }
 
       binderEl.setAttribute("data-state", "closed");
+      if (lidRevealPage) lidRevealPage.style.opacity = "0";
       lid.style.transition = "none";
       lid.style.opacity = "1";
       lid.style.transform =
