@@ -839,15 +839,18 @@
         const dest = destination.find(Boolean) || null;
         const currentSpread = B.spreads[B.cur] || [null, null];
         await hydrateLeafImage(source, pageMeta(currentSpread[1]));
+        // Single preparation for the destination page: the underlay behind
+        // the turning sheet needs the same content as the sheet's own back
+        // face, but as a separate DOM node (it can't share the node the
+        // sheet is about to own). Build+hydrate once and clone the result
+        // instead of running buildReadyLeafContent's async preload/decode
+        // pipeline twice for the same page. The underlay is pointer-events:
+        // none, so the clone not carrying the (inert-until-clicked) reader
+        // button's live listener has no visible effect.
         const back = dest
           ? await buildReadyLeafContent(pageMeta(dest), "right")
           : await buildReadyLeafContent(null, "right");
-        underlay = makeTurnUnderlay(
-          dest
-            ? await buildReadyLeafContent(pageMeta(dest), "right")
-            : await buildReadyLeafContent(null, "right"),
-          0, rect.width
-        );
+        underlay = makeTurnUnderlay(back.cloneNode(true), 0, rect.width);
         if (!active) { underlay.remove(); navigationBusy = false; return false; }
         sheet = makeTurnSheet(source, back, forward ? 1 : -1);
         slotR.style.visibility = "hidden";
