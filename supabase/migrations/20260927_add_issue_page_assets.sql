@@ -42,6 +42,9 @@ create table if not exists public.issue_pages (
 
 alter table public.issue_pages enable row level security;
 
+grant select on table public.issue_pages to anon;
+grant select, insert, update, delete on table public.issue_pages to authenticated;
+
 do $$
 begin
   if not exists (
