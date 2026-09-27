@@ -264,7 +264,7 @@ img{max-width:100%}
 .leaf-ruled{position:absolute;inset:0;
   background:repeating-linear-gradient(transparent 0 calc(var(--lw)*.075 - 1px),rgba(63,111,147,.22) calc(var(--lw)*.075 - 1px) calc(var(--lw)*.075));
   background-position:0 calc(var(--lw)*.12)}
-.leaf-back-paper{position:absolute;inset:0;background:linear-gradient(120deg,rgba(255,255,255,.22),rgba(0,0,0,.06))}
+.leaf-back-paper{position:absolute;inset:0;background:linear-gradient(120deg,rgba(255,255,255,.22),rgba(0,0,0,.06)),#faf5e8}
 
 /* ---------- data-driven page content (the real "book page" — see js/binder.js buildSpreadPage) ----------
    Scaled with the same var(--lw) (binder width) unit as .tbc above, so
