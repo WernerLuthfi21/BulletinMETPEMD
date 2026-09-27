@@ -388,17 +388,6 @@ img{max-width:100%}
 .physical-turn-underlay .leaf{
   position:absolute;inset:0;width:100%;height:100%;
 }
-.physical-turn-underlay::after{
-  content:"";position:absolute;inset:0;z-index:6;pointer-events:none;
-  background:
-    radial-gradient(ellipse 54% 74% at 48% 50%,rgba(12,5,2,.52),transparent 70%),
-    linear-gradient(90deg,transparent 18%,rgba(18,7,3,.10) 50%,transparent 82%);
-  opacity:var(--turn-cast-opacity,0);
-  transform:translate3d(var(--turn-cast-x,0px),var(--turn-cast-y,0px),0) scale(var(--turn-cast-scale,.90));
-  transform-origin:50% 50%;
-  mix-blend-mode:multiply;
-  will-change:opacity,transform;
-}
 
 .physical-turn{
   position:absolute;top:0;height:100%;z-index:20;pointer-events:none;
@@ -415,16 +404,9 @@ img{max-width:100%}
   border:1px solid rgba(60,45,28,.10);
   box-shadow:0 5px 10px rgba(18,7,3,.14);
 }
-.physical-turn-face::before{
-  content:"";position:absolute;inset:-10% -34%;z-index:10;pointer-events:none;
-  background:
-    radial-gradient(ellipse 30% 92% at 48% 50%,rgba(255,255,255,.70),transparent 70%),
-    linear-gradient(108deg,transparent 33%,rgba(255,255,255,.76) 50%,transparent 67%);
-  opacity:var(--page-light-opacity,0);
-  transform:translate3d(var(--page-sheen-x, -58%),0,0) scaleX(.94);
-  mix-blend-mode:screen;
-  will-change:opacity,transform;
-}
+/* A narrow moving-looking paper edge. It is intentionally subtle: the
+   geometry still comes from the 3D hinge, while this highlight gives the
+   eye a rolled paper edge instead of a plastic card edge. */
 .physical-turn-face::after{
   content:"";position:absolute;top:0;bottom:0;right:0;width:18px;
   pointer-events:none;z-index:9;
@@ -432,7 +414,6 @@ img{max-width:100%}
     linear-gradient(90deg,transparent 0%,rgba(255,255,255,.05) 35%,
     rgba(255,255,255,.55) 55%,rgba(72,50,32,.18) 78%,transparent 100%);
   opacity:.48;
-  mix-blend-mode:normal;
 }
 .physical-turn-face.back::after{
   right:auto;left:0;
@@ -440,30 +421,6 @@ img{max-width:100%}
     linear-gradient(90deg,transparent 0%,rgba(72,50,32,.18) 22%,
     rgba(255,255,255,.45) 48%,rgba(255,255,255,.05) 72%,transparent 100%);
 }
-.page-depth-light,
-.page-depth-shadow{
-  position:absolute;inset:-8% -18%;z-index:11;pointer-events:none;
-  mix-blend-mode:screen;
-  opacity:0;will-change:opacity,transform;
-}
-.page-depth-light{
-  background:
-    radial-gradient(ellipse 22% 88% at 50% 50%,rgba(255,255,255,.92),transparent 70%),
-    linear-gradient(106deg,transparent 38%,rgba(255,255,255,.62) 50%,transparent 62%);
-  transform-origin:50% 50%;
-}
-.page-depth-shadow{
-  z-index:12;
-  background:
-    linear-gradient(90deg,rgba(18,7,3,.78),transparent 28% 74%,rgba(18,7,3,.20)),
-    radial-gradient(ellipse 22% 92% at 50% 50%,rgba(18,7,3,.44),transparent 68%),
-    linear-gradient(90deg,transparent 0 46%,rgba(255,255,255,.04) 50%,transparent 54%);
-  mix-blend-mode:multiply;
-  transform-origin:50% 50%;
-}
-/* A narrow moving-looking paper edge. It is intentionally subtle: the
-   geometry still comes from the 3D hinge, while this highlight gives the
-   eye a rolled paper edge instead of a plastic card edge. */
 .physical-turn-face.front{transform:rotateY(0deg) translateZ(.7px)}
 .physical-turn-face.back{transform:rotateY(180deg) translateZ(.7px)}
 .physical-turn-face .leaf{
@@ -474,81 +431,21 @@ img{max-width:100%}
 .physical-turn-shade{
   position:absolute;inset:0;z-index:8;pointer-events:none;
   background:
-    linear-gradient(90deg,rgba(8,3,1,.64),rgba(8,3,1,.10) 22%,transparent 62%),
-    linear-gradient(100deg,transparent 35%,rgba(255,255,255,.18) 50%,transparent 66%);
-  opacity:var(--page-fold-opacity,0);
+    linear-gradient(90deg,rgba(8,3,1,.38),rgba(8,3,1,.08) 20%,transparent 58%),
+    linear-gradient(100deg,transparent 35%,rgba(255,255,255,.16) 50%,transparent 66%);
   mix-blend-mode:multiply;
-  will-change:opacity;
 }
 .physical-turn-face.back .physical-turn-shade{
   background:
     linear-gradient(90deg,transparent 28%,rgba(8,3,1,.06) 62%,rgba(8,3,1,.30)),
     linear-gradient(80deg,transparent 36%,rgba(255,255,255,.12) 50%,transparent 64%);
 }
-/* Desktop-only material polish: visual depth only; flip geometry remains unchanged. */
-@media (min-width:901px){
-  .binder::before{
-    content:"";position:absolute;inset:5px 4px 8px;z-index:2;pointer-events:none;
-    border-radius:11px;
-    box-shadow:
-      inset 0 0 0 1px rgba(255,255,255,.20),
-      inset 0 0 18px rgba(255,238,222,.08),
-      inset 0 -8px 15px rgba(16,5,2,.10);
-    background:linear-gradient(135deg,rgba(255,255,255,.028),transparent 30% 68%,rgba(0,0,0,.055));
-    mix-blend-mode:soft-light;
-  }
-  .cover::before{
-    content:"";position:absolute;inset:2px;z-index:2;pointer-events:none;
-    border-radius:inherit;
-    background:
-      linear-gradient(112deg,transparent 24%,rgba(255,255,255,.10) 40%,transparent 56%),
-      linear-gradient(90deg,rgba(255,255,255,.07),transparent 18% 82%,rgba(0,0,0,.08));
-    box-shadow:inset 0 0 0 1px rgba(255,235,230,.12),inset 0 -3px 7px rgba(0,0,0,.10);
-    mix-blend-mode:soft-light;
-  }
-  .cover::after{
-    content:"";position:absolute;inset:0;z-index:3;pointer-events:none;
-    border-radius:inherit;
-    background:linear-gradient(90deg,rgba(0,0,0,.16),transparent 13% 87%,rgba(0,0,0,.05));
-    opacity:.55;mix-blend-mode:multiply;
-  }
-  .b-crease::after{
-    content:"";position:absolute;left:50%;top:2px;bottom:2px;width:2px;
-    transform:translateX(-50%);
-    background:linear-gradient(180deg,rgba(255,255,255,.30),rgba(255,255,255,.06) 18%,rgba(0,0,0,.16) 50%,rgba(255,255,255,.05) 82%,rgba(0,0,0,.10));
-    box-shadow:0 0 7px rgba(0,0,0,.15);
-    opacity:.72;
-  }
-  .physical-turn-face{
-    box-shadow:
-      0 7px 12px rgba(18,7,3,.18),
-      inset 0 0 0 1px rgba(255,255,255,.16);
-  }
-  .physical-turn-face::after{width:24px;opacity:.66}
-  .page-depth-shadow{filter:drop-shadow(0 4px 8px rgba(18,7,3,.10))}
-  .slot{box-shadow:0 10px 12px rgba(20,8,3,.34)}
-}
-
 @media (prefers-reduced-motion:reduce){
   .physical-turn{transition:none!important}
-  .physical-turn-face::before,
-  .physical-turn-face::after,
-  .physical-turn-underlay::after,
-  .page-depth-light,
-  .page-depth-shadow,
-  .lid-face.front::before,
-  .lid-face.front::after,
-  .lid-reveal-page::after{
-    opacity:0!important;transform:none!important;
-  }
 }
  
 @media (max-width:900px){
   .physical-turn{z-index:40}
-  .physical-turn-face::before,
-  .physical-turn-underlay::after,
-  .page-depth-light,
-  .page-depth-shadow{display:none!important}
   /* Mobile uses one printed page per physical sheet. Page 2 is a separate
      underlay, so the turning sheet must not show a second page on its back. */
   .binder[data-mode="single"] .physical-turn-face.back{visibility:hidden}
@@ -728,14 +625,6 @@ button.key svg,a.key svg{width:17px;height:17px;flex:none}
     linear-gradient(90deg,rgba(30,16,8,.13),transparent 8% 82%,rgba(0,0,0,.05)),
     linear-gradient(180deg,rgba(255,255,255,.18),transparent 16%,rgba(0,0,0,.03));
 }
-.lid-reveal-page::after{
-  content:"";position:absolute;inset:-8% -30%;z-index:6;pointer-events:none;
-  background:linear-gradient(108deg,transparent 35%,rgba(255,255,255,.48) 50%,transparent 65%);
-  transform:translate3d(var(--cover-sheen-x,-52%),0,0);
-  opacity:calc(var(--cover-light,0) * .72);
-  mix-blend-mode:screen;
-  will-change:opacity,transform;
-}
 
 .lid-face .shade{
   position:absolute;inset:0;z-index:10;
@@ -745,22 +634,11 @@ button.key svg,a.key svg{width:17px;height:17px;flex:none}
   transition:opacity .08s linear;
 }
 .lid-hinge{position:absolute;left:0;top:0;bottom:0;width:26px;background:linear-gradient(90deg,rgba(0,0,0,.42),rgba(0,0,0,.10) 60%,transparent);pointer-events:none}
-.lid-face.front::before{
-  content:"";position:absolute;inset:-8% -30%;z-index:8;pointer-events:none;
-  background:linear-gradient(108deg,transparent 35%,rgba(255,255,255,.65) 50%,transparent 65%);
-  transform:translate3d(var(--cover-sheen-x,-52%),0,0);
-  opacity:var(--cover-light,0);
-  mix-blend-mode:screen;
-  will-change:opacity,transform;
-}
 .lid-face.front::after{
-  content:"";position:absolute;inset:0;pointer-events:none;z-index:9;
-  background:
-    linear-gradient(90deg,rgba(10,2,3,.34),transparent 17% 82%,rgba(10,2,3,.10)),
-    linear-gradient(108deg,transparent 24%,rgba(255,244,235,.14) 42%,transparent 58%);
-  transform:translateX(-35%);opacity:var(--cover-fold-shadow,0);
-  mix-blend-mode:multiply;
-  will-change:opacity,transform;
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(108deg,transparent 24%,rgba(255,244,235,.14) 42%,transparent 58%);
+  transform:translateX(-35%);opacity:.0;
+  mix-blend-mode:screen;
 }
 .binder[data-state="open"] .lid-face.front::after{opacity:.75}
 .lid-hinge{box-shadow:inset -6px 0 9px rgba(0,0,0,.18)}
