@@ -1127,7 +1127,10 @@
       lid.style.opacity = "0";
       lid.style.pointerEvents = "none";
       binderEl.removeAttribute("data-cover-opening");
-      if (lidRevealPage) lidRevealPage.style.opacity = "0";
+      if (lidRevealPage) {
+        lidRevealPage.style.transition = "none";
+        lidRevealPage.style.opacity = "0";
+      }
       return;
     }
 
@@ -1180,9 +1183,17 @@
       // on screen. Then expose the real spread and retire the temporary plane;
       // this removes both the loading flash and the closing/opening after-image.
       lid.style.transition = "opacity 110ms ease";
-      if (lidRevealPage) lidRevealPage.style.opacity = "1";
+      if (lidRevealPage) {
+        lidRevealPage.style.transition = "opacity 110ms ease";
+        lidRevealPage.style.opacity = "1";
+      }
       binderEl.removeAttribute("data-cover-opening");
       lid.style.opacity = "0";
+      if (lidRevealPage) {
+        setTimeout(() => {
+          lidRevealPage.style.opacity = "0";
+        }, 18);
+      }
       lid.style.pointerEvents = "none";
       lid.style.transform =
         "translate3d(0,0,0) rotateY(-178deg) rotateX(0deg)";
@@ -1214,7 +1225,10 @@
     }
 
     lid.style.opacity = "1";
-    if (lidRevealPage) lidRevealPage.style.opacity = "1";
+    if (lidRevealPage) {
+      lidRevealPage.style.transition = "none";
+      lidRevealPage.style.opacity = "1";
+    }
     lid.style.transformOrigin = "left center";
     lid.style.transition = "none";
 
