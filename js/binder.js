@@ -1073,9 +1073,6 @@
     const p = .5 - .5 * Math.cos(Math.PI * M.clamp(progress, 0, 1));
     const coverAngle = -180 * p;
     lid.style.transform = "rotateY(" + coverAngle.toFixed(3) + "deg)";
-    // The turning geometry must never be revealed through a second clip path.
-    // The binder/page boundary owns clipping; the cover simply swings away.
-    spreadEl.style.clipPath = "";
     paintPaperMotion(p);
     const shade = Math.sin(Math.PI * p);
     lidShade.style.opacity = String(Math.min(.5, shade * .58));
