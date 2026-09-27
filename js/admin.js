@@ -191,7 +191,7 @@
     $("#fContributors").value = row ? (row.contributors || []).join(", ") : "";
     $("#fDisplayPageCount").value = String(row && row.display_page_count ? row.display_page_count : 1);
     $("#fPublished").checked = row ? row.status === "published" : false;
-    $(".maxMbLabel").forEach((n) => (n.textContent = cfg.maxUploadMB || 50));
+    Array.from(document.querySelectorAll(".maxMbLabel")).forEach((n) => (n.textContent = cfg.maxUploadMB || 50));
     renderHighlights(row && row.highlights ? row.highlights : []);
     renderPageUploadZones(row);
     syncPageUploadVisibility();
