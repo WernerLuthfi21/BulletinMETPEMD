@@ -10,6 +10,16 @@
     "src": "assets/audio/astaga-bercanda.mp3"
   },
   {
+    "id": "mechanical-room-tone",
+    "label": "Mechanical Room Tone",
+    "src": "assets/audio/mechanical-room-tone.mp3"
+  },
+  {
+    "id": "read",
+    "label": "Read",
+    "src": "assets/audio/read.mp3"
+  },
+  {
     "id": "dj-mabur-duwur-melayang-layang",
     "label": "DJ Mabur Duwur Melayang Layang",
     "src": "assets/audio/dj-mabur-duwur-melayang-layang.mp3"
