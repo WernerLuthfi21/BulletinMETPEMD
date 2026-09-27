@@ -397,6 +397,9 @@ img{max-width:100%}
  
 @media (max-width:900px){
   .physical-turn{z-index:40}
+  /* Mobile uses one printed page per physical sheet. Page 2 is a separate
+     underlay, so the turning sheet must not show a second page on its back. */
+  .binder[data-mode="single"] .physical-turn-face.back{visibility:hidden}
 }
 
 /* ---------- 7. rings, sticker, control bar, index tabs ---------- */
