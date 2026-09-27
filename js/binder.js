@@ -386,9 +386,15 @@
     return leaf;
   }
 
-  async function buildReadyLeafContent(meta, side) {
+  function buildReadyLeafContent(meta, side) {
     const leaf = buildLeafContent(meta, side);
-    return hydrateLeafImage(leaf, meta);
+    if (!meta || meta.placeholder || (meta.issue && meta.issue.spread)) return Promise.resolve(leaf);
+    if (!leaf.querySelector(".leaf-img")) {
+      hydrateLeafImage(leaf, meta).catch((e) => {
+        console.warn("[METP] destination page hydration failed; leaving retry UI visible", e);
+      });
+    }
+    return Promise.resolve(leaf);
   }
 
   function buildPlaceholder(meta) {
@@ -782,11 +788,12 @@
     const dir = target > B.cur ? 1 : -1;
     navigationBusy = true;
     try {
-      // Warm the exact destination before creating the moving leaf. This is
-      // intentionally a hard prerequisite for animation: a spinner must
-      // never become the face of a moving page.
-      const ready = await ensureSpreadReady(B.spreads[target]);
-      if (!ready) return;
+      // Warm the exact destination opportunistically, but never block the
+      // navigation on a network/rendering failure. The destination leaf has
+      // its own loading/retry UI and must not freeze the binder controls.
+      ensureSpreadReady(B.spreads[target]).catch((e) => {
+        console.warn("[METP] destination warm-up failed; continuing with live loader", e);
+      });
       if (target === B.cur || flipping || !B.opened) return;
       await animatePhysicalTurn(dir, target, viaTab);
       currentSpreadReady = false;
