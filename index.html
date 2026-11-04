@@ -356,16 +356,26 @@
 <dialog id="reader" aria-label="Bulletin reader">
   <div class="reader">
     <div class="reader-bar">
-      <h2 id="readerTitle">Reader</h2>
-      <button class="key sq" id="rdPrev" type="button" aria-label="Previous page"><svg><use href="#i-prev"/></svg></button>
-      <span class="b-label" id="rdCount" style="color:#f6e3dd;min-width:58px;text-align:center"></span>
-      <button class="key sq" id="rdNext" type="button" aria-label="Next page"><svg><use href="#i-next"/></svg></button>
-      <button class="key sq" id="rdOut" type="button" aria-label="Zoom out"><svg><use href="#i-out"/></svg></button>
-      <button class="key sq" id="rdIn" type="button" aria-label="Zoom in"><svg><use href="#i-zoom"/></svg></button>
-      <button class="key" id="rdText" type="button" aria-pressed="false" hidden><svg><use href="#i-text"/></svg><span class="txt">Text</span></button>
-      <button class="key sq" id="rdClose" type="button" aria-label="Close reader"><svg><use href="#i-close"/></svg></button>
+      <div class="reader-heading">
+        <h2 id="readerTitle">Reader</h2>
+        <button class="key sq" id="rdClose" type="button" aria-label="Close reader"><svg><use href="#i-close"/></svg></button>
+      </div>
+      <div class="reader-controls" role="group" aria-label="Reader controls">
+        <div class="reader-control-group" role="group" aria-label="Page navigation">
+          <button class="key sq" id="rdPrev" type="button" aria-label="Previous page" disabled><svg><use href="#i-prev"/></svg></button>
+          <span class="b-label" id="rdCount" aria-live="polite">1 / 1</span>
+          <button class="key sq" id="rdNext" type="button" aria-label="Next page" disabled><svg><use href="#i-next"/></svg></button>
+        </div>
+        <div class="reader-control-group" role="group" aria-label="Zoom controls">
+          <button class="key sq" id="rdOut" type="button" aria-label="Zoom out"><svg><use href="#i-out"/></svg></button>
+          <button class="key sq" id="rdIn" type="button" aria-label="Zoom in"><svg><use href="#i-zoom"/></svg></button>
+          <button class="key" id="rdFit" type="button" aria-label="Fit page to screen">Fit</button>
+          <span class="reader-zoom-value" id="rdZoomValue" aria-live="off">Fit</span>
+        </div>
+        <button class="key" id="rdText" type="button" aria-pressed="false" hidden><svg><use href="#i-text"/></svg><span class="txt">Text</span></button>
+      </div>
     </div>
-    <div class="reader-body" id="readerBody" tabindex="0"><img id="readerImg" alt=""></div>
+    <div class="reader-body" id="readerBody" tabindex="0" aria-label="Bulletin page. Drag to pan, pinch to zoom, or double tap to zoom."><img id="readerImg" alt=""></div>
     <div class="reader-text" id="readerText" hidden></div>
   </div>
 </dialog>
