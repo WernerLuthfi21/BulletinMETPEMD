@@ -18,7 +18,7 @@
   const fitBtn = document.getElementById("rdFit");
 
   const MIN_ZOOM = 0.08;
-  const MAX_ZOOM = 4;
+  const MAX_ZOOM = 3;
   const ZOOM_FACTOR = 1.2;
 
   let issue = null;
@@ -221,7 +221,7 @@
     return Math.hypot(a.x - b.x, a.y - b.y);
   }
 
-  function startPan(point) {
+  function startPan(point, suppressTap) {
     gesture = {
       type: "pan",
       pointerId: point.id,
@@ -229,7 +229,7 @@
       startY: point.y,
       startLeft: body.scrollLeft,
       startTop: body.scrollTop,
-      moved: false
+      moved: !!suppressTap
     };
   }
 
@@ -324,7 +324,7 @@
     if (pointers.size >= 2) {
       startPinch();
     } else if (pointers.size === 1) {
-      startPan(Array.from(pointers.values())[0]);
+      startPan(Array.from(pointers.values())[0], true);
     } else {
       gesture = null;
       body.classList.remove("is-gesturing");
