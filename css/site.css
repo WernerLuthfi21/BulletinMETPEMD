@@ -1019,3 +1019,7 @@ html.reader-open,html.reader-open body{overflow:hidden;overscroll-behavior:none}
   .lid-gear{width:14%}.lid-open-note{font-size:10px;padding:8px 10px}.lid-sticker{top:24%;width:90%}.lid-note{font-size:13px}.lid-label{display:none}
   .lid-stamp{width:22%;right:9%}.lid-photo{width:50%;left:44%;bottom:20%}
 }
+
+/* Zoom guard: no decorative motion while the page is being pinch-zoomed or panned while zoomed. */
+html.is-zooming *,html.is-zooming *::before,html.is-zooming *::after,
+html.is-zoomed *,html.is-zoomed *::before,html.is-zoomed *::after{animation-play-state:paused!important}
