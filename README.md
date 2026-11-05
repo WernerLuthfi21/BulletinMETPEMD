@@ -67,19 +67,19 @@ that everyone sees, connect a free [Supabase](https://supabase.com) project:
    ```
    Only UIDs listed here can write anything — every other visitor, signed in
    or not, is treated as a read-only member of the public.
-6. **Fill in `config.js`** with your project's URL and anon (public) key,
-   both found in Project Settings → API:
+6. **Fill in `config.js`** with your project URL and publishable (public) key,
+   both found in Project Settings → API Keys:
    ```js
    window.METP_CONFIG = {
      supabaseUrl: "https://xxxxxxxx.supabase.co",
-     supabaseAnonKey: "eyJ...",
+     supabasePublishableKey: "sb_publishable_...",
      bucket: "bulletins",
      maxUploadMB: 25
    };
    ```
-   The anon key is meant to be public — every write it can make is enforced
-   server-side by the RLS policies in step 2. **Never** put a service-role
-   key here or anywhere in the frontend.
+   The publishable key is intended for browser use; access is enforced
+   server-side by the RLS policies in step 2. **Never** put a secret or
+   service-role key here or anywhere in the frontend.
 7. Reload `index.html` and `admin.html`. Sign in to the admin panel at
    `admin.html` with the login from step 4.
 

@@ -9,7 +9,8 @@
   "use strict";
   const M = window.METP;
   const cfg = () => window.METP_CONFIG || {};
-  const isLive = () => !!(cfg().supabaseUrl && cfg().supabaseAnonKey);
+  const publicKey = () => cfg().supabasePublishableKey || cfg().supabaseAnonKey; // legacy fallback for older local configs
+  const isLive = () => !!(cfg().supabaseUrl && publicKey());
   const withTimeout = M.withTimeout;
   // Ceiling for a single page's network/render work (signing a URL, fetching
   // a PDF byte-range, rasterising a canvas). A slow connection is fine — an
@@ -25,7 +26,7 @@
       clientPromise = (async () => {
         if (!window.supabase) await M.loadScript("vendor/supabase/supabase.min.js");
         // The public page never signs in: it only reads what RLS allows anonymous visitors to read.
-        return window.supabase.createClient(cfg().supabaseUrl, cfg().supabaseAnonKey, {
+        return window.supabase.createClient(cfg().supabaseUrl, publicKey(), {
           auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
         });
       })();

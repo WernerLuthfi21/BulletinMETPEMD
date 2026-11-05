@@ -1,7 +1,7 @@
 /* ==========================================================================
    METP admin panel
    --------------------------------------------------------------------------
-   Everything here talks directly to Supabase using the PUBLIC anon key —
+   Everything here talks directly to Supabase using the PUBLIC publishable key —
    that is safe because every write is enforced server-side by Row Level
    Security (see supabase/schema.sql): only a signed-in user listed in the
    `admins` table can insert/update/delete anything. This file never embeds
@@ -10,6 +10,7 @@
 (function () {
   "use strict";
   const cfg = window.METP_CONFIG || {};
+  const publicKey = cfg.supabasePublishableKey || cfg.supabaseAnonKey; // legacy fallback for older local configs
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
   const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -37,13 +38,13 @@
     toastT = setTimeout(() => (t.className = "toast"), 3600);
   }
 
-  if (!cfg.supabaseUrl || !cfg.supabaseAnonKey) {
+  if (!cfg.supabaseUrl || !publicKey) {
     $("#loginForm").hidden = true;
     $("#notConfigured").hidden = false;
     return;
   }
 
-  const supa = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
+  const supa = window.supabase.createClient(cfg.supabaseUrl, publicKey, {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
   });
 
@@ -384,7 +385,7 @@
       const url = cfg.supabaseUrl.replace(/\/$/, "") + "/storage/v1/object/" + encodeURIComponent(cfg.bucket || "bulletins") + "/" + path.split("/").map(encodeURIComponent).join("/");
       xhr.open("POST", url);
       xhr.setRequestHeader("Authorization", "Bearer " + session.access_token);
-      xhr.setRequestHeader("apikey", cfg.supabaseAnonKey);
+      xhr.setRequestHeader("apikey", publicKey);
       xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
       xhr.setRequestHeader("x-upsert", "true");
       xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100)); };
