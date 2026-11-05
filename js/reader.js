@@ -269,7 +269,10 @@
       img.style.width = baseW + "px";
       img.alt = page.alt || "";
       if (img.getAttribute("src") !== src) img.src = src;
-      try { if (img.decode) await img.decode(); } catch (error) {}
+      // Show the page as soon as it is decoded, but never stall more than ~1.2s on it.
+      try {
+        if (img.decode) await Promise.race([img.decode(), new Promise((r) => setTimeout(r, 1200))]);
+      } catch (error) {}
       if (requestId !== pageRequestId) return;
 
       measure();
@@ -329,6 +332,7 @@
     root.classList.add("reader-open");
     if (typeof dlg.showModal === "function") dlg.showModal();
     else dlg.setAttribute("open", "");
+    try { body.focus({ preventScroll: true }); } catch (error) {}
     setPage(page || 0);
   }
 

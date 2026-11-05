@@ -192,6 +192,7 @@
     <!-- ============ BINDER ============ -->
     <section class="binder-zone" aria-label="Bulletin binder">
       <div class="binder" id="binder" data-state="closed" data-mode="dual">
+        <script>document.getElementById("binder").setAttribute("data-mode",window.matchMedia("(max-width: 900px)").matches?"single":"dual")</script>
         <div class="b-shadow"></div>
         <div class="cover left"></div>
         <div class="cover right"></div>

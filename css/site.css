@@ -45,11 +45,12 @@
 
 /* ---------- 2. base ---------- */
 *{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%}
+html{-webkit-text-size-adjust:100%;overscroll-behavior-y:none}
 html,body{margin:0;min-height:100%}
 body{
   font-family:var(--ui);color:var(--ink);background:#3a2213;
-  overflow-x:hidden;-webkit-tap-highlight-color:transparent;
+  overflow-x:hidden;overflow-x:clip;-webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
 }
 button{font-family:inherit;color:inherit}
 img{max-width:100%}
@@ -62,7 +63,7 @@ img{max-width:100%}
   position:relative;min-height:100vh;min-height:100dvh;
   display:grid;place-items:center;padding:24px 12px 28px;
   background:#4a2b17 url(../assets/textures/desk-wood.webp) center/cover no-repeat;
-  isolation:isolate;
+  isolation:isolate;overflow-x:clip;max-width:100vw;
 }
 /* soft key-light pool + edge falloff, same direction as every prop */
 .desk::before{
@@ -944,15 +945,16 @@ html.reader-open,html.reader-open body{overflow:hidden;overscroll-behavior:none}
 /* ---------- 12. interaction polish ---------- */
 @media (max-width:600px){
   .reader{width:100vw;height:100dvh}
-  .reader-bar{display:block;padding:calc(8px + env(safe-area-inset-top,0px)) 8px 8px}
-  .reader-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 7px}
-  .reader-heading h2{flex:1 1 auto;min-width:0;margin:0;font-size:14px}
-  .reader-heading #rdClose{order:1}
-  .reader-controls{width:100%;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  /* One compact row: page nav, zoom, text, close. The page gets the screen. */
+  .reader-bar{display:flex;align-items:center;gap:4px;padding:calc(6px + env(safe-area-inset-top,0px)) calc(6px + env(safe-area-inset-right,0px)) 6px calc(6px + env(safe-area-inset-left,0px))}
+  .reader-heading{display:contents}
+  .reader-heading h2{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  .reader-heading #rdClose{order:3}
+  .reader-controls{order:1;flex:1 1 auto;min-width:0;justify-content:space-between;gap:4px;flex-wrap:nowrap}
   .reader-control-group{gap:3px}
-  .reader-controls .key,.reader-heading .key{height:44px;min-width:38px}
-  .reader-control-group #rdCount{min-width:50px;font-size:11px}
-  .reader-zoom-value{min-width:30px;font-size:10px}
+  .reader-controls .key,.reader-heading .key{height:42px;min-width:38px}
+  .reader-control-group #rdCount{min-width:42px;font-size:11px;text-align:center}
+  .reader-zoom-value{display:none}
   #rdFit{min-width:40px;padding:0 8px}
   .reader-text{max-height:42%;padding:12px 14px calc(16px + env(safe-area-inset-bottom,0px))}
 }
@@ -961,7 +963,6 @@ html.reader-open,html.reader-open body{overflow:hidden;overscroll-behavior:none}
   .reader-control-group{gap:2px}
   .reader-controls .key,.reader-heading .key{min-width:36px}
   .reader-control-group #rdCount{min-width:44px}
-  .reader-zoom-value{min-width:27px}
 }
 
 /* ---------- 13. closed-cover art: match the physical mockup language ---------- */
