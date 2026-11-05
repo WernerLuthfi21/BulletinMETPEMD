@@ -94,6 +94,7 @@ img{max-width:100%}
   transition:transform 1.05s cubic-bezier(.16,.82,.22,1);
   transform:translate3d(0,0,0) rotate(-.35deg);
   transform-style:preserve-3d;
+  will-change:transform;
 }
 /* closed: only the right half (front cover) is visible, centred */
 /* (+ half the tab gutter, so the lone cover sits centred between the desk props) */
@@ -105,6 +106,7 @@ img{max-width:100%}
   background:rgba(14,5,2,.55);filter:blur(18px);
   transition:opacity .18s ease,transform .18s ease;
   transform-origin:58% 42%;
+  will-change:transform,opacity;
 }
 .binder[data-state="closed"] .b-shadow{clip-path:inset(0 0 0 50%)}
 
@@ -257,7 +259,7 @@ img{max-width:100%}
 .leaf::before{
   content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
   background:url(../assets/textures/paper-grain.webp) 0 0/220px auto;
-  opacity:.10;
+  mix-blend-mode:multiply;opacity:.10;
 }
 /* inner-edge falloff into the gutter + ring holes on the hinge edge */
 .leaf::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:4}
@@ -796,7 +798,8 @@ dialog::backdrop{background:rgba(18,8,3,.78);backdrop-filter:blur(2px)}
 .reader-body{flex:1;min-height:0;position:relative;overflow:hidden;background:#2a1a10 url(../assets/textures/paper-grain.webp);background-blend-mode:multiply;cursor:grab;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;overscroll-behavior:none;touch-action:none;contain:layout paint;outline:none}
 .reader-body:focus-visible{box-shadow:inset 0 0 0 2px rgba(255,255,255,.55)}
 .reader-body.is-gesturing{cursor:grabbing}
-.reader-body img{position:absolute;left:0;top:0;display:block;width:0;height:auto;max-width:none;transform-origin:0 0;background:#fff;box-shadow:3px 6px 14px rgba(0,0,0,.55);opacity:0;transition:opacity .18s ease;pointer-events:none;user-select:none;-webkit-user-select:none;-webkit-user-drag:none;-webkit-touch-callout:none;will-change:transform}
+.reader-body img{position:absolute;left:0;top:0;display:block;width:0;height:auto;max-width:none;transform-origin:0 0;background:#fff;box-shadow:3px 6px 14px rgba(0,0,0,.55);opacity:0;transition:opacity .18s ease;pointer-events:none;user-select:none;-webkit-user-select:none;-webkit-user-drag:none;-webkit-touch-callout:none;backface-visibility:hidden}
+.reader-body.is-gesturing img{will-change:transform}
 .reader-body.is-loading::after{content:"";position:absolute;left:50%;top:50%;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;border:3px solid rgba(255,255,255,.2);border-top-color:rgba(255,255,255,.85);animation:rd-spin .8s linear infinite}
 @keyframes rd-spin{to{transform:rotate(360deg)}}
 .reader-status{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:12px;padding:18px 22px;max-width:80%;text-align:center;color:#f6e0da;background:rgba(0,0,0,.55);border-radius:10px;font:500 14px/1.4 var(--ui)}

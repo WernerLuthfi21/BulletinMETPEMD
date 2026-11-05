@@ -39,7 +39,6 @@
   let vw = 0;
   let vh = 0;
   let fitScale = 1;
-  let K = 1;               // layer resolution factor: the image is laid out K× larger and scaled by 1/K
   let showText = false;
   let pageRequestId = 0;
   let anim = null;
@@ -104,7 +103,7 @@
 
   /* ---------- rendering ---------- */
   function render() {
-    img.style.transform = "translate3d(" + view.x + "px," + view.y + "px,0) scale(" + (view.s / K) + ")";
+    img.style.transform = "translate3d(" + view.x + "px," + view.y + "px,0) scale(" + view.s + ")";
     const label = Math.abs(view.s - fitScale) < 0.012 ? "Fit" : Math.round(view.s * 100) + "%";
     if (label !== lastLabel && zoomValue) {
       lastLabel = label;
@@ -267,6 +266,7 @@
       const src = page.hi || page.src;
       baseW = page.w;
       baseH = page.h;
+      img.style.width = baseW + "px";
       img.alt = page.alt || "";
       if (img.getAttribute("src") !== src) img.src = src;
       // Show the page as soon as it is decoded, but never stall more than ~1.2s on it.
@@ -275,9 +275,6 @@
       } catch (error) {}
       if (requestId !== pageRequestId) return;
 
-      // Rasterise at (up to) native resolution once, so zooming never re-rasterises or blurs.
-      K = img.naturalWidth ? clamp(img.naturalWidth / baseW, 1, 2) : 1;
-      img.style.width = baseW * K + "px";
       measure();
       const b = bounds(fitScale);
       const slide = dir && !reduce() ? dir * Math.min(vw * 0.35, 220) : 0;
