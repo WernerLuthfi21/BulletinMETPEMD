@@ -27,7 +27,7 @@
       lastScale = vv.scale;
       root.classList.add("is-zooming");
       clearTimeout(timer);
-      timer = setTimeout(settle, 220);
+      timer = setTimeout(settle, 350);
     }
   }
 

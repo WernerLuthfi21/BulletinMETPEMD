@@ -1023,3 +1023,8 @@ html.reader-open,html.reader-open body{overflow:hidden;overscroll-behavior:none}
 /* Zoom guard: no decorative motion while the page is being pinch-zoomed or panned while zoomed. */
 html.is-zooming *,html.is-zooming *::before,html.is-zooming *::after,
 html.is-zoomed *,html.is-zoomed *::before,html.is-zoomed *::after{animation-play-state:paused!important}
+/* While zooming, swap the two costliest effects for visually equivalent cheap ones:
+   a full-size blur filter becomes a plain box-shadow, and the full-page multiply
+   grain becomes a normal low-alpha overlay. Both revert the moment zooming stops. */
+html.is-zooming .b-shadow,html.is-zoomed .b-shadow{filter:none;background:rgba(14,5,2,.45);box-shadow:0 0 26px 12px rgba(14,5,2,.45)}
+html.is-zooming .leaf::before,html.is-zoomed .leaf::before{mix-blend-mode:normal}
