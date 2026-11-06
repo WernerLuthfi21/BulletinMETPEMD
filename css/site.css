@@ -474,6 +474,11 @@ img{max-width:100%}
 }
 .ring svg{display:block;width:100%;height:100%;overflow:visible}
 .binder[data-mode="single"] .ring{left:-9px;width:32px}
+/* Open binder: the steel rings pass through the punched holes, so they sit ABOVE the
+   pages (the rod stays behind them). While a sheet turns, the sheet is above the rings. */
+.binder[data-state="open"] .rings{z-index:auto}
+.binder[data-state="open"] .rail{z-index:6}
+.binder[data-state="open"] .ring{z-index:9}
 
 .sticker{position:absolute;z-index:6;left:calc(var(--ms) + 6px);top:6px;width:min(300px,calc(var(--lw)*.9));aspect-ratio:300/78;
   transform:rotate(-1.6deg);filter:var(--sh-2);transition:width .3s var(--ease),left .3s var(--ease),top .3s var(--ease),transform .25s var(--ease),opacity .4s;cursor:pointer}
