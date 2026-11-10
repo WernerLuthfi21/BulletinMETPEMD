@@ -1033,3 +1033,52 @@ html.is-zoomed *,html.is-zoomed *::before,html.is-zoomed *::after{animation-play
    grain becomes a normal low-alpha overlay. Both revert the moment zooming stops. */
 html.is-zooming .b-shadow,html.is-zoomed .b-shadow{filter:none;background:rgba(14,5,2,.45);box-shadow:0 0 26px 12px rgba(14,5,2,.45)}
 html.is-zooming .leaf::before,html.is-zoomed .leaf::before{mix-blend-mode:normal}
+
+/* ==========================================================================
+   COVER v2 — "engineering drawing sheet"
+   The cover reads like a sheet from the department's own drawing set, top to bottom:
+     1. controls   (settings, open)               — utility row, one baseline
+     2. identity   (METP title + the team's photo stickers on its corners)
+     3. statement  (the mission, one strip)
+     4. evidence   (growth chart tag, stamped as approved)
+     5. title block (hairline rule + discipline tag + motto), as on a drawing sheet
+   One frame, one centre axis, one light direction. Motion is limited to the single
+   affordance that matters: the "open" arrow. Photo stickers are unchanged.
+   ========================================================================== */
+.lid-face.front::before{
+  content:"";position:absolute;inset:2.6% 4.2% 2.6% 9%;z-index:0;pointer-events:none;
+  border:1.5px solid rgba(252,228,222,.30);border-radius:2px;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.14),0 1px 0 rgba(0,0,0,.18);
+  background:linear-gradient(rgba(252,228,222,.30),rgba(252,228,222,.30)) 0 calc(100% - 11%)/100% 1.5px no-repeat;
+}
+/* 1 · controls — same baseline, aligned to the frame */
+.lid-gear{left:11%;top:5.2%;width:11.5%;transform:rotate(-3deg)}
+.lid-gear svg{animation:none}
+.lid-open-note{right:7%;top:5.4%;transform:rotate(1.5deg)}
+.lid-open{right:6%;top:4.6%}
+.lid-open-note span{display:inline-block;animation:metp-arrow-nudge 2.4s var(--ease) infinite}
+@keyframes metp-arrow-nudge{0%,100%{transform:translateX(0)}50%{transform:translateX(4px)}}
+/* 2 · identity — title on the axis; the team's stickers (unchanged) hang on its corners */
+.lid-sticker{left:7%;top:24.5%;width:87%;transform:rotate(-1.5deg)}
+/* 3 · statement — one centred strip */
+.lid-note-a{
+  left:11%;right:11%;top:43%;bottom:auto;animation:none;transform:rotate(-.8deg);
+  text-align:center;white-space:nowrap;padding:8px 10px;
+  font-size:calc(var(--lw)*.037);line-height:1.05;
+}
+.lid-note-a .dot{margin:0 .35em;opacity:.55}
+/* 4 · evidence — chart tag centred on the axis, seal stamped over its corner */
+.lid-photo{left:24%;top:56%;bottom:auto;width:52%;transform:rotate(-1.5deg);animation:none}
+.lid-stamp{right:9%;top:69%;width:19%;transform:rotate(9deg);animation:none}
+/* 5 · title block — discipline tag (left) and motto (right) share one row under the rule */
+.lid-mini{left:9.5%;bottom:5.2%;transform:none}
+.lid-note.ribbon{right:15%;bottom:5%;transform:rotate(0deg);animation:none}
+@media (max-width:900px){
+  .lid-gear{width:12.5%}
+  .lid-sticker{top:24.5%;width:87%}
+  .lid-note-a{font-size:calc(var(--lw)*.037)}
+  .lid-stamp{width:19%;right:9%}
+  .lid-photo{width:52%;left:24%;bottom:auto}
+}
+@media (max-width:430px){.lid-mini.tag .tag-globe{display:none}}
+@media (prefers-reduced-motion:reduce){.lid-open-note span{animation:none}}
