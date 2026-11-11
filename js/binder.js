@@ -1126,6 +1126,7 @@
 
     if (M.reducedMotion()) {
       lid.style.opacity = "0";
+      lid.style.visibility = "hidden";
       lid.style.pointerEvents = "none";
       binderEl.removeAttribute("data-cover-opening");
       if (lidRevealPage) {
@@ -1190,6 +1191,9 @@
       }
       binderEl.removeAttribute("data-cover-opening");
       lid.style.opacity = "0";
+      // Once the cover is fully open it must not paint at all (some GPUs leak the
+      // back-facing cover content through opacity:0 when children are animated).
+      setTimeout(() => { if (B.opened) lid.style.visibility = "hidden"; }, 160);
       if (lidRevealPage) {
         setTimeout(() => {
           lidRevealPage.style.opacity = "0";
@@ -1214,6 +1218,7 @@
 
     B.opened = false;
     lid.setAttribute("tabindex", "0");
+    lid.style.visibility = "";
     lid.style.pointerEvents = "";
     M.sound && M.sound.close();
 
